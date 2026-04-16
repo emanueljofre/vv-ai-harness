@@ -1,0 +1,182 @@
+{
+  "data": [
+    {
+      "groupId": "78357527-cb45-8c37-9c4c-cc8279f4c219",
+      "groupName": "Administrator Section",
+      "formControls": [
+        {
+          "fieldID": "47ec5b3c-ec98-1512-1d24-35041c267881",
+          "fieldName": "",
+          "fieldType": 2,
+          "formControlType": 0
+        }
+      ],
+      "isReadOnlyConditionList": [],
+      "isVisibleConditionList": [],
+      "isReadOnlyList": [],
+      "isVisibleList": [
+        {
+          "securityMemberID": "ca815c7d-c6f1-437c-b89b-e7cbd7b29c30",
+          "securityMemberType": 1
+        }
+      ]
+    },
+    {
+      "groupId": "3b79287b-a027-b201-9120-1eb41bcf0b6c",
+      "groupName": "Hidden Fields",
+      "formControls": [
+        {
+          "fieldID": "54a235fc-0e50-a76e-a6ca-46d9193ad8a1",
+          "fieldName": "",
+          "fieldType": 2,
+          "formControlType": 0
+        }
+      ],
+      "isReadOnlyConditionList": [],
+      "isVisibleConditionList": [
+        {
+          "logicType": 0,
+          "conditionId": "419224d9-9526-e5e6-a3cd-741111e961ca",
+          "conditionIndex": 0,
+          "fieldValue1": {
+            "conditionFormFieldType": 0,
+            "fieldID": "028be65d-29e9-e169-a46d-3c55d4c1cc15",
+            "fieldName": "",
+            "fieldType": 2,
+            "isValueLoaded": false,
+            "parentType": 2,
+            "value": ""
+          },
+          "fieldValue2": {
+            "conditionFormFieldType": 0,
+            "fieldID": "00000000-0000-0000-0000-000000000000",
+            "fieldName": "",
+            "fieldType": 2,
+            "isValueLoaded": false,
+            "parentType": 0,
+            "value": "True"
+          },
+          "outcome": 2
+        }
+      ],
+      "isReadOnlyList": [],
+      "isVisibleList": []
+    },
+    {
+      "groupId": "2afe7ac3-f24b-8022-2453-1808b44174e3",
+      "groupName": "HideFormControls",
+      "formControls": [
+        {
+          "fieldID": "00000001-0000-0000-0000-e1000000f003",
+          "fieldName": "",
+          "fieldType": 3,
+          "formControlType": 3
+        },
+        {
+          "fieldID": "00000001-0000-0000-0000-e1000000f004",
+          "fieldName": "",
+          "fieldType": 3,
+          "formControlType": 4
+        },
+        {
+          "fieldID": "00000001-0000-0000-0000-e1000000f001",
+          "fieldName": "",
+          "fieldType": 3,
+          "formControlType": 1
+        },
+        {
+          "fieldID": "00000001-0000-0000-0000-e1000000f007",
+          "fieldName": "",
+          "fieldType": 3,
+          "formControlType": 7
+        }
+      ],
+      "isReadOnlyConditionList": [],
+      "isVisibleConditionList": [
+        {
+          "logicType": 0,
+          "conditionId": "5b76d900-b9bd-b0ca-6db0-73483fab43ca",
+          "conditionIndex": 0,
+          "fieldValue1": {
+            "conditionFormFieldType": 0,
+            "fieldID": "028be65d-29e9-e169-a46d-3c55d4c1cc15",
+            "fieldName": "",
+            "fieldType": 2,
+            "isValueLoaded": false,
+            "parentType": 2,
+            "value": ""
+          },
+          "fieldValue2": {
+            "conditionFormFieldType": 0,
+            "fieldID": "00000000-0000-0000-0000-000000000000",
+            "fieldName": "",
+            "fieldType": 2,
+            "isValueLoaded": false,
+            "parentType": 0,
+            "value": "True"
+          },
+          "outcome": 2
+        }
+      ],
+      "isReadOnlyList": [],
+      "isVisibleList": []
+    },
+    {
+      "groupId": "efd6e225-c5ee-0413-3ca0-1e8aa0f7cc9d",
+      "groupName": "Read Only Fields",
+      "formControls": [
+        {
+          "fieldID": "37a71828-c35b-0b81-ed09-92dba94c1f99",
+          "fieldName": "",
+          "fieldType": 2,
+          "formControlType": 0
+        },
+        {
+          "fieldID": "9438be1b-5a7e-325b-d784-b6fd45e58945",
+          "fieldName": "",
+          "fieldType": 2,
+          "formControlType": 0
+        },
+        {
+          "fieldID": "9d1e1cb2-dbc1-b859-3143-77cbc3766b46",
+          "fieldName": "",
+          "fieldType": 2,
+          "formControlType": 0
+        }
+      ],
+      "isReadOnlyConditionList": [
+        {
+          "logicType": 4,
+          "conditionId": "4318df3e-a3d0-c909-6606-f1e5a4393d98",
+          "conditionIndex": 0,
+          "fieldValue1": {
+            "conditionFormFieldType": 0,
+            "fieldID": "028be65d-29e9-e169-a46d-3c55d4c1cc15",
+            "fieldName": "",
+            "fieldType": 2,
+            "isValueLoaded": false,
+            "parentType": 2,
+            "value": ""
+          },
+          "fieldValue2": {
+            "conditionFormFieldType": 0,
+            "fieldID": "00000000-0000-0000-0000-000000000000",
+            "fieldName": "",
+            "fieldType": 2,
+            "isValueLoaded": false,
+            "parentType": 0,
+            "value": "True"
+          },
+          "outcome": 3
+        }
+      ],
+      "isVisibleConditionList": [],
+      "isReadOnlyList": [],
+      "isVisibleList": []
+    }
+  ],
+  "meta": {
+    "status": 200,
+    "errors": null
+  }
+}
