@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Template with accessibility violations for testing:
+  - Missing AccessibilityLabel on textbox
+  - Required field (label has asterisk) without "field Required" in accessibility label
+  - Checkbox (self-labeled) with asterisk in Text but no "field Required"
+-->
+<FormEntity>
+  <FormPages>
+    <FormPage ID="page1">
+      <Name>Page 1</Name>
+      <Width>800</Width>
+      <Height>600</Height>
+      <FieldList>
+        <BaseField xsi:type="FieldLabel" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+          <Name>Label Email</Name>
+          <ID>lbl1</ID>
+          <LayoutLeft>50</LayoutLeft>
+          <LayoutTop>50</LayoutTop>
+          <Width>80</Width>
+          <TabOrder>0</TabOrder>
+          <AccessibilityLabel></AccessibilityLabel>
+          <Text>Email *</Text>
+          <ContainerId></ContainerId>
+          <ZOrder>0</ZOrder>
+        </BaseField>
+        <BaseField xsi:type="FieldTextbox3" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+          <Name>Email</Name>
+          <ID>field1</ID>
+          <LayoutLeft>140</LayoutLeft>
+          <LayoutTop>50</LayoutTop>
+          <Width>200</Width>
+          <TabOrder>1</TabOrder>
+          <AccessibilityLabel>Email</AccessibilityLabel>
+          <Text></Text>
+          <ContainerId></ContainerId>
+          <ZOrder>1</ZOrder>
+        </BaseField>
+        <BaseField xsi:type="FieldTextbox3" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+          <Name>Phone</Name>
+          <ID>field2</ID>
+          <LayoutLeft>140</LayoutLeft>
+          <LayoutTop>100</LayoutTop>
+          <Width>200</Width>
+          <TabOrder>2</TabOrder>
+          <AccessibilityLabel></AccessibilityLabel>
+          <Text></Text>
+          <ContainerId></ContainerId>
+          <ZOrder>2</ZOrder>
+        </BaseField>
+        <BaseField xsi:type="FieldCheckbox" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+          <Name>Agree to Terms</Name>
+          <ID>field3</ID>
+          <LayoutLeft>100</LayoutLeft>
+          <LayoutTop>150</LayoutTop>
+          <Width>200</Width>
+          <TabOrder>3</TabOrder>
+          <AccessibilityLabel>Agree to Terms</AccessibilityLabel>
+          <Text>I agree to the terms *</Text>
+          <ContainerId></ContainerId>
+          <ZOrder>3</ZOrder>
+        </BaseField>
+      </FieldList>
+    </FormPage>
+  </FormPages>
+  <ScriptLibrary />
+  <ScriptAssignments />
+  <GroupsHolder>
+    <GroupCollection />
+  </GroupsHolder>
+</FormEntity>

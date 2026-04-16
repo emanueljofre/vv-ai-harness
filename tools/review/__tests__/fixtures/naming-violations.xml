@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Template with deliberate field-naming violations for testing:
+  - Default names (DataField1, DataField2)
+  - Duplicate names (Dup Field)
+  - Empty name
+  - Non-title-case (firstName)
+  - Invalid identifier (Field #1)
+-->
+<FormEntity>
+  <FormPages>
+    <FormPage ID="page1">
+      <Name>Page 1</Name>
+      <Width>800</Width>
+      <Height>600</Height>
+      <FieldList>
+        <BaseField xsi:type="FieldTextbox3" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+          <Name>DataField1</Name>
+          <ID>f1</ID>
+          <LayoutLeft>100</LayoutLeft>
+          <LayoutTop>50</LayoutTop>
+          <Width>200</Width>
+          <TabOrder>1</TabOrder>
+          <AccessibilityLabel>DataField1</AccessibilityLabel>
+          <Text></Text>
+          <ContainerId></ContainerId>
+          <ZOrder>1</ZOrder>
+        </BaseField>
+        <BaseField xsi:type="FieldTextbox3" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+          <Name>firstName</Name>
+          <ID>f2</ID>
+          <LayoutLeft>100</LayoutLeft>
+          <LayoutTop>100</LayoutTop>
+          <Width>200</Width>
+          <TabOrder>2</TabOrder>
+          <AccessibilityLabel>firstName</AccessibilityLabel>
+          <Text></Text>
+          <ContainerId></ContainerId>
+          <ZOrder>2</ZOrder>
+        </BaseField>
+        <BaseField xsi:type="FieldTextbox3" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+          <Name>Dup Field</Name>
+          <ID>f3</ID>
+          <LayoutLeft>100</LayoutLeft>
+          <LayoutTop>150</LayoutTop>
+          <Width>200</Width>
+          <TabOrder>3</TabOrder>
+          <AccessibilityLabel>Dup Field</AccessibilityLabel>
+          <Text></Text>
+          <ContainerId></ContainerId>
+          <ZOrder>3</ZOrder>
+        </BaseField>
+        <BaseField xsi:type="FieldTextbox3" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+          <Name>Dup Field</Name>
+          <ID>f4</ID>
+          <LayoutLeft>100</LayoutLeft>
+          <LayoutTop>200</LayoutTop>
+          <Width>200</Width>
+          <TabOrder>4</TabOrder>
+          <AccessibilityLabel>Dup Field</AccessibilityLabel>
+          <Text></Text>
+          <ContainerId></ContainerId>
+          <ZOrder>4</ZOrder>
+        </BaseField>
+        <BaseField xsi:type="FieldTextbox3" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+          <Name></Name>
+          <ID>f5</ID>
+          <LayoutLeft>100</LayoutLeft>
+          <LayoutTop>250</LayoutTop>
+          <Width>200</Width>
+          <TabOrder>5</TabOrder>
+          <AccessibilityLabel></AccessibilityLabel>
+          <Text></Text>
+          <ContainerId></ContainerId>
+          <ZOrder>5</ZOrder>
+        </BaseField>
+        <BaseField xsi:type="FieldTextbox3" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+          <Name>Field #1</Name>
+          <ID>f6</ID>
+          <LayoutLeft>100</LayoutLeft>
+          <LayoutTop>300</LayoutTop>
+          <Width>200</Width>
+          <TabOrder>6</TabOrder>
+          <AccessibilityLabel>Field #1</AccessibilityLabel>
+          <Text></Text>
+          <ContainerId></ContainerId>
+          <ZOrder>6</ZOrder>
+        </BaseField>
+      </FieldList>
+    </FormPage>
+  </FormPages>
+  <ScriptLibrary />
+  <ScriptAssignments />
+  <GroupsHolder>
+    <GroupCollection />
+  </GroupsHolder>
+</FormEntity>

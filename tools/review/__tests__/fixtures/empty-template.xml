@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Edge-case: valid FormEntity with no fields, no scripts, no groups.
+  Rules should return empty findings arrays without crashing.
+-->
+<FormEntity>
+  <FormPages>
+    <FormPage ID="page1">
+      <Name>Page 1</Name>
+      <Width>800</Width>
+      <Height>600</Height>
+      <FieldList />
+    </FormPage>
+  </FormPages>
+  <ScriptLibrary />
+  <ScriptAssignments />
+  <GroupsHolder>
+    <GroupCollection />
+  </GroupsHolder>
+</FormEntity>

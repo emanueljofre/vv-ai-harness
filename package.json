@@ -60,6 +60,8 @@
     },
     "scripts": {
         "test": "jest",
+        "test:watch": "jest --watch",
+        "test:coverage": "jest --coverage",
         "test:pw": "npx playwright test --config=testing/playwright.config.js",
         "test:pw:brt": "npx playwright test --config=testing/playwright.config.js --project='BRT-*'",
         "test:pw:ist": "npx playwright test --config=testing/playwright.config.js --project='IST-*'",

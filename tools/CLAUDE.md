@@ -41,6 +41,37 @@ Tools connect to live VV environments. See root `CLAUDE.md` § "Write Safety" fo
 - **Audit scripts** that create test records (e.g., `audit-bug2-db-evidence.js`) should use `saveFormOnly()` from `testing/helpers/vv-form.js` so the write-policy guard applies. New audit scripts that write data require explicit user approval.
 - **Do not modify** `lib/VVRestApi/VVRestApiNodeJs/common.js` (the API-layer write guard) without explicit user approval.
 
+## Unit Testing
+
+All tools must have unit tests. Tests live co-located with each tool using `__tests__/` directories. Framework: **Jest** (configured in root `jest.config.js`).
+
+```bash
+npm test                  # Run all unit tests
+npm run test:watch        # Watch mode (re-run on file changes)
+npm run test:coverage     # Run with coverage report
+```
+
+### Directory Convention
+
+```
+tools/{tool-name}/
+  __tests__/
+    fixtures/             # XML, JSON, or other test data
+    helpers.js            # Shared test utilities for this tool
+    {module}.test.js      # Tests for lib/{module}.js
+    rules/
+      {rule-module}.test.js  # Tests for rules/{rule-module}.js
+```
+
+### Writing Tests
+
+- **One test file per source module** — `rules/field-naming.js` → `__tests__/rules/field-naming.test.js`
+- **Use helpers** — `loadFixture()` for XML fixtures, `buildContext()` for inline data, `runRule()` for single-rule execution
+- **Use custom matchers** — `toContainFinding()`, `toContainFindingMatch()`, `toHaveFindingCount()`
+- **Test both pass and fail cases** — every rule needs tests for clean inputs and violation inputs
+- **Test edge cases** — empty templates, missing fields, boundary values
+- See [Unit Testing Guide](../docs/guides/unit-testing.md) for full conventions and patterns.
+
 ## Conventions
 
 1. **Environment-agnostic.** Tools work for any VV customer/environment, not just WADNR. Customer-specific references belong in `projects/`, not here.

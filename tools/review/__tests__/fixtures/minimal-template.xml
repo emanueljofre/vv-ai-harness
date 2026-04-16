@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Minimal VV form template for unit testing.
+  Contains one field of each major type on a single page.
+  All fields use valid, standards-compliant values by default.
+-->
+<FormEntity>
+  <FormPages>
+    <FormPage ID="page1">
+      <Name>Page 1</Name>
+      <Width>800</Width>
+      <Height>600</Height>
+      <FieldList>
+        <BaseField xsi:type="FieldTextbox3" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+          <Name>First Name</Name>
+          <ID>field1</ID>
+          <LayoutLeft>100</LayoutLeft>
+          <LayoutTop>50</LayoutTop>
+          <Width>200</Width>
+          <TabOrder>1</TabOrder>
+          <AccessibilityLabel>First Name</AccessibilityLabel>
+          <Text></Text>
+          <ContainerId></ContainerId>
+          <ZOrder>1</ZOrder>
+        </BaseField>
+        <BaseField xsi:type="FieldCalendar3" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+          <Name>Date of Birth</Name>
+          <ID>field2</ID>
+          <LayoutLeft>100</LayoutLeft>
+          <LayoutTop>100</LayoutTop>
+          <Width>200</Width>
+          <TabOrder>2</TabOrder>
+          <AccessibilityLabel>Date of Birth</AccessibilityLabel>
+          <Text></Text>
+          <ContainerId></ContainerId>
+          <ZOrder>2</ZOrder>
+          <EnableTime>false</EnableTime>
+          <IgnoreTimezone>true</IgnoreTimezone>
+          <UseLegacyDatePicker>false</UseLegacyDatePicker>
+        </BaseField>
+        <BaseField xsi:type="FieldDropDownList3" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+          <Name>State</Name>
+          <ID>field3</ID>
+          <LayoutLeft>100</LayoutLeft>
+          <LayoutTop>150</LayoutTop>
+          <Width>200</Width>
+          <TabOrder>3</TabOrder>
+          <AccessibilityLabel>State</AccessibilityLabel>
+          <Text></Text>
+          <ContainerId></ContainerId>
+          <ZOrder>3</ZOrder>
+        </BaseField>
+        <BaseField xsi:type="FieldLabel" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+          <Name>Header Label</Name>
+          <ID>label1</ID>
+          <LayoutLeft>50</LayoutLeft>
+          <LayoutTop>10</LayoutTop>
+          <Width>300</Width>
+          <TabOrder>0</TabOrder>
+          <AccessibilityLabel></AccessibilityLabel>
+          <Text>Application Form</Text>
+          <ContainerId></ContainerId>
+          <ZOrder>0</ZOrder>
+        </BaseField>
+      </FieldList>
+    </FormPage>
+  </FormPages>
+  <ScriptLibrary>
+    <FormScriptItem>
+      <ScriptItemId>script1</ScriptItemId>
+      <Name>onLoad</Name>
+      <Script>var firstName = VV.Form.GetFieldValue('First Name');</Script>
+      <ScriptItemType>Function</ScriptItemType>
+    </FormScriptItem>
+  </ScriptLibrary>
+  <ScriptAssignments>
+    <FormScriptAssignment>
+      <ScriptItemId>script1</ScriptItemId>
+      <ControlId>field1</ControlId>
+      <EventId>onLoad</EventId>
+    </FormScriptAssignment>
+  </ScriptAssignments>
+  <GroupsHolder>
+    <GroupCollection>
+      <Group>
+        <GroupName>ReadOnly Group</GroupName>
+        <FieldCollection>
+          <FieldMember>
+            <FieldID>field1</FieldID>
+            <FieldType>FieldTextbox3</FieldType>
+            <FormControlType>None</FormControlType>
+          </FieldMember>
+        </FieldCollection>
+      </Group>
+    </GroupCollection>
+  </GroupsHolder>
+</FormEntity>

@@ -48,6 +48,22 @@ module.exports = [
         },
     },
     {
+        files: ['tools/**/__tests__/**/*.js'],
+        languageOptions: {
+            globals: {
+                describe: 'readonly',
+                it: 'readonly',
+                test: 'readonly',
+                expect: 'readonly',
+                beforeAll: 'readonly',
+                beforeEach: 'readonly',
+                afterAll: 'readonly',
+                afterEach: 'readonly',
+                jest: 'readonly',
+            },
+        },
+    },
+    {
         files: ['testing/**/*.js'],
         languageOptions: {
             globals: {
