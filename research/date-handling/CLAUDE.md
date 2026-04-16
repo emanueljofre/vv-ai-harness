@@ -6,15 +6,15 @@ Comprehensive investigation of date handling defects across **all VisualVault co
 
 ## Scope
 
-| Component                           | Status      | Folder                                                                         |
-| ----------------------------------- | ----------- | ------------------------------------------------------------------------------ |
-| **Forms — Calendar Fields**         | In Progress | `forms-calendar/` (Cat 1-13 complete, Cat 14 Phase A done, Cat 15-16 complete) |
-| **Web Services (REST API)**         | Complete    | `web-services/` (validated on WADNR 2026-04-10)                                |
-| **Analytic Dashboards**             | Complete    | `dashboards/` (validated on WADNR 2026-04-10)                                  |
-| **VisualVault Reports**             | Not Started | `reports/` (future)                                                            |
-| **Document Library (index fields)** | In Progress | `document-library/` (matrix: 8 categories, 52 slots)                           |
-| **Workflows (date triggers)**       | Not Started | `workflows/` (future)                                                          |
-| **Node.js Client Library**          | Not Started | `node-client/` (future)                                                        |
+| Component                           | Status      | Folder                                                                                                            |
+| ----------------------------------- | ----------- | ----------------------------------------------------------------------------------------------------------------- |
+| **Forms — Calendar Fields**         | In Progress | `forms-calendar/` (Cat 1-13 complete, Cat 14 Phase A done, Cat 15-16 complete, JSON template validation complete) |
+| **Web Services (REST API)**         | Complete    | `web-services/` (validated on WADNR 2026-04-10)                                                                   |
+| **Analytic Dashboards**             | Complete    | `dashboards/` (validated on WADNR 2026-04-10)                                                                     |
+| **VisualVault Reports**             | Not Started | `reports/` (future)                                                                                               |
+| **Document Library (index fields)** | In Progress | `document-library/` (matrix: 8 categories, 52 slots)                                                              |
+| **Workflows (date triggers)**       | Not Started | `workflows/` (future)                                                                                             |
+| **Node.js Client Library**          | Not Started | `node-client/` (future)                                                                                           |
 
 ## Folder Structure
 
@@ -34,6 +34,7 @@ research/date-handling/
 - **Mixed timezone storage**: Same `datetime` column contains both UTC values (from `toISOString()`) and timezone-ambiguous local values (from `getSaveValue()`).
 - **API write path**: REST API (`postForms`) stores dates uniformly — no Config C/D divergence, no FORM-BUG-7. Mixed storage is exclusively a Forms Angular pipeline issue.
 - **All 6 cross-cutting questions answered.** See `analysis/temporal-models.md`.
+- **JSON templates**: Newer Form Designer uses a sparse JSON format (only non-default values stored). Designer exposes all date flags. Validated: identical behavior to XML templates per config. See `forms-calendar/analysis/json-template-date-behavior.md`.
 
 ## Confirmed Bugs
 
