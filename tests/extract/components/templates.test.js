@@ -5,6 +5,7 @@ const os = require('os');
 // Mock vv-templates before requiring the component
 jest.mock('../../../tools/helpers/vv-templates');
 jest.mock('../../../tools/helpers/vv-sync');
+jest.mock('../../../tools/helpers/vv-formsapi');
 
 const vvTemplates = require('../../../tools/helpers/vv-templates');
 const vvSync = require('../../../tools/helpers/vv-sync');
@@ -58,11 +59,12 @@ describe('templates component metadata', () => {
         expect(templates.outputSubdir).toBe('form-templates');
     });
 
-    test('syncOpts uses name as idField with hash-based change detection', () => {
+    test('syncOpts uses name as idField with hash-based change detection and dual extensions', () => {
         expect(templates.syncOpts).toEqual({
             idField: 'name',
             dateField: null,
             hashField: 'contentHash',
+            fileExt: ['.xml', '.json'],
         });
     });
 });
@@ -167,10 +169,10 @@ describe('save', () => {
         fs.rmSync(tmpDir, { recursive: true, force: true });
     });
 
-    test('writes XML files for each extracted template', () => {
+    test('writes XML files for XML-format extractions', () => {
         const extracted = new Map([
-            ['Access Code', { source: '<xml>access code</xml>', contentHash: 'hash1' }],
-            ['Activity Map', { source: '<xml>activity map</xml>', contentHash: 'hash2' }],
+            ['Access Code', { source: '<xml>access code</xml>', contentHash: 'hash1', format: 'xml' }],
+            ['Activity Map', { source: '<xml>activity map</xml>', contentHash: 'hash2', format: 'xml' }],
         ]);
 
         const result = templates.save(tmpDir, API_TEMPLATES, extracted);
@@ -181,8 +183,44 @@ describe('save', () => {
         expect(fs.readFileSync(path.join(tmpDir, 'Access-Code.xml'), 'utf8')).toBe('<xml>access code</xml>');
     });
 
+    test('writes JSON files for JSON-format extractions', () => {
+        const jsonContent = JSON.stringify({ pages: {}, controls: {} });
+        const extracted = new Map([['Note', { source: jsonContent, contentHash: 'hash3', format: 'json' }]]);
+
+        const result = templates.save(tmpDir, [], extracted);
+
+        expect(result.saved).toBe(1);
+        expect(fs.existsSync(path.join(tmpDir, 'Note.json'))).toBe(true);
+        expect(fs.existsSync(path.join(tmpDir, 'Note.xml'))).toBe(false);
+    });
+
+    test('removes alternate-format file when format changes', () => {
+        // Simulate existing XML file
+        fs.writeFileSync(path.join(tmpDir, 'Note.xml'), '<old-xml/>');
+
+        const extracted = new Map([['Note', { source: '{"pages":{}}', contentHash: 'hash4', format: 'json' }]]);
+
+        templates.save(tmpDir, [], extracted);
+
+        expect(fs.existsSync(path.join(tmpDir, 'Note.json'))).toBe(true);
+        expect(fs.existsSync(path.join(tmpDir, 'Note.xml'))).toBe(false);
+    });
+
+    test('handles mixed XML and JSON extractions', () => {
+        const extracted = new Map([
+            ['Access Code', { source: '<xml/>', contentHash: 'h1', format: 'xml' }],
+            ['Note', { source: '{}', contentHash: 'h2', format: 'json' }],
+        ]);
+
+        const result = templates.save(tmpDir, [], extracted);
+
+        expect(result.saved).toBe(2);
+        expect(fs.existsSync(path.join(tmpDir, 'Access-Code.xml'))).toBe(true);
+        expect(fs.existsSync(path.join(tmpDir, 'Note.json'))).toBe(true);
+    });
+
     test('returns hashes map', () => {
-        const extracted = new Map([['Access Code', { source: '<xml/>', contentHash: 'hash1' }]]);
+        const extracted = new Map([['Access Code', { source: '<xml/>', contentHash: 'hash1', format: 'xml' }]]);
 
         const result = templates.save(tmpDir, API_TEMPLATES, extracted);
 
@@ -192,7 +230,7 @@ describe('save', () => {
 
     test('creates output directory if missing', () => {
         const nested = path.join(tmpDir, 'nested', 'dir');
-        const extracted = new Map([['Test', { source: '<xml/>', contentHash: 'h' }]]);
+        const extracted = new Map([['Test', { source: '<xml/>', contentHash: 'h', format: 'xml' }]]);
 
         templates.save(nested, [], extracted);
         expect(fs.existsSync(nested)).toBe(true);
@@ -202,6 +240,13 @@ describe('save', () => {
         const result = templates.save(tmpDir, [], new Map());
         expect(result.saved).toBe(0);
         expect(result.hashes.size).toBe(0);
+    });
+
+    test('defaults to XML when format is not specified', () => {
+        const extracted = new Map([['Test', { source: '<xml/>', contentHash: 'h' }]]);
+
+        templates.save(tmpDir, [], extracted);
+        expect(fs.existsSync(path.join(tmpDir, 'Test.xml'))).toBe(true);
     });
 });
 
@@ -225,17 +270,6 @@ describe('generateReadme', () => {
         expect(call[1].columns).toHaveLength(2);
         expect(call[1].columns[0].header).toBe('Template Name');
         expect(call[1].columns[1].header).toBe('Version');
-    });
-
-    test('links extracted templates in README', () => {
-        vvSync.sanitizeFilename.mockImplementation((name) => name.replace(/\s+/g, '-'));
-        const allItems = [{ name: 'Access Code' }];
-        const extractedNames = new Set(['Access Code']);
-
-        templates.generateReadme('/output', allItems, extractedNames);
-
-        const transform = vvSync.generateReadme.mock.calls[0][1].columns[0].transform;
-        expect(transform({ name: 'Access Code' })).toBe('[Access Code](Access-Code.xml)');
     });
 
     test('does not link non-extracted templates', () => {

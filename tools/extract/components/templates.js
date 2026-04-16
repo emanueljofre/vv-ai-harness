@@ -15,6 +15,7 @@ const fs = require('fs');
 const crypto = require('crypto');
 const vvTemplates = require('../../helpers/vv-templates');
 const vvSync = require('../../helpers/vv-sync');
+const vvFormsApi = require('../../helpers/vv-formsapi');
 
 const CONCURRENCY = 3;
 
@@ -22,7 +23,7 @@ module.exports = {
     name: 'templates',
     adminSection: 'FormTemplateAdmin',
     outputSubdir: 'form-templates',
-    syncOpts: { idField: 'name', dateField: null, hashField: 'contentHash' },
+    syncOpts: { idField: 'name', dateField: null, hashField: 'contentHash', fileExt: ['.xml', '.json'] },
 
     /**
      * Fetch metadata via the VV REST API.
@@ -82,7 +83,8 @@ module.exports = {
      */
     async extract(_page, config, itemsToExtract, context) {
         const results = new Map();
-        const errors = [];
+        const jsonFallbacks = [];
+        const skipped = [];
         let nextIdx = 0;
         const total = itemsToExtract.length;
         const workerCount = Math.min(CONCURRENCY, total);
@@ -100,7 +102,7 @@ module.exports = {
                     process.stdout.write(`  [W${workerId}] [${idx + 1}/${total}] ${item.name}...`);
 
                     if (!item.revisionId) {
-                        errors.push({ name: item.name, error: 'missing revisionId' });
+                        skipped.push({ name: item.name, error: 'missing revisionId' });
                         process.stdout.write(` SKIP (no revisionId)\n`);
                         continue;
                     }
@@ -109,15 +111,15 @@ module.exports = {
                         const xml = await downloadExport(workerPage, config, item);
                         if (xml) {
                             const hash = crypto.createHash('sha256').update(xml).digest('hex');
-                            results.set(item.name, { source: xml, contentHash: hash });
+                            results.set(item.name, { source: xml, contentHash: hash, format: 'xml' });
                             process.stdout.write(` OK (${(xml.length / 1024).toFixed(1)} KB)\n`);
                         } else {
-                            errors.push({ name: item.name, error: 'empty response' });
-                            process.stdout.write(` EMPTY\n`);
+                            jsonFallbacks.push(item);
+                            process.stdout.write(` EMPTY (queued for JSON fallback)\n`);
                         }
                     } catch (err) {
-                        errors.push({ name: item.name, error: err.message });
-                        process.stdout.write(` ERROR: ${err.message}\n`);
+                        jsonFallbacks.push(item);
+                        process.stdout.write(` ${err.message} (queued for JSON fallback)\n`);
                     }
                 }
             } catch (err) {
@@ -133,8 +135,57 @@ module.exports = {
         }
         await Promise.allSettled(workers);
 
-        if (errors.length > 0) {
-            console.log(`  Errors (${errors.length}): ${errors.map((e) => e.name).join(', ')}`);
+        // JSON fallback via preformsapi for templates that failed XML export
+        if (jsonFallbacks.length > 0) {
+            console.log(`\n  JSON fallback: ${jsonFallbacks.length} templates via preformsapi...`);
+            try {
+                const fallbackPage = await context.newPage();
+                const baseApi = `${config.baseUrl}/api/v1/${config.customerAlias}/${config.databaseAlias}`;
+                const formsApiUrl = await vvFormsApi.discoverFormsApiUrl(fallbackPage, baseApi);
+                const jwt = await vvFormsApi.getJwt(fallbackPage, baseApi);
+
+                for (const item of jsonFallbacks) {
+                    process.stdout.write(`    ${item.name}...`);
+                    if (!item.revisionId) {
+                        skipped.push({ name: item.name, error: 'no revisionId for JSON fallback' });
+                        process.stdout.write(` SKIP (no revisionId)\n`);
+                        continue;
+                    }
+
+                    try {
+                        const json = await vvFormsApi.fetchTemplateJson(
+                            fallbackPage,
+                            formsApiUrl,
+                            item.revisionId,
+                            jwt
+                        );
+                        const source = JSON.stringify(json, null, 2);
+                        const hash = crypto.createHash('sha256').update(source).digest('hex');
+                        results.set(item.name, { source, contentHash: hash, format: 'json' });
+                        process.stdout.write(` OK (JSON, ${(source.length / 1024).toFixed(1)} KB)\n`);
+                    } catch (err) {
+                        skipped.push({ name: item.name, error: err.message });
+                        process.stdout.write(` JSON ERROR: ${err.message}\n`);
+                    }
+                }
+
+                await fallbackPage.close();
+            } catch (err) {
+                console.error(`  JSON fallback setup failed: ${err.message}`);
+                for (const item of jsonFallbacks) {
+                    if (!results.has(item.name)) skipped.push({ name: item.name, error: err.message });
+                }
+            }
+        }
+
+        if (skipped.length > 0) {
+            console.log(`  Skipped (${skipped.length}): ${skipped.map((e) => e.name).join(', ')}`);
+        }
+
+        const xmlCount = [...results.values()].filter((r) => r.format === 'xml').length;
+        const jsonCount = [...results.values()].filter((r) => r.format === 'json').length;
+        if (jsonCount > 0) {
+            console.log(`  Results: ${xmlCount} XML + ${jsonCount} JSON`);
         }
 
         return results;
@@ -150,9 +201,19 @@ module.exports = {
         const hashes = new Map();
 
         for (const [name, data] of extracted) {
-            const fn = vvSync.sanitizeFilename(name) + '.xml';
-            fs.writeFileSync(path.join(outputDir, fn), data.source, 'utf8');
+            const ext = data.format === 'json' ? '.json' : '.xml';
+            const altExt = data.format === 'json' ? '.xml' : '.json';
+            const baseName = vvSync.sanitizeFilename(name);
+
+            fs.writeFileSync(path.join(outputDir, baseName + ext), data.source, 'utf8');
             saved++;
+
+            // Remove alternate-format file if it exists (format may change between runs)
+            const altPath = path.join(outputDir, baseName + altExt);
+            if (fs.existsSync(altPath)) {
+                fs.unlinkSync(altPath);
+            }
+
             if (data.contentHash) {
                 hashes.set(name, data.contentHash);
             }
@@ -173,8 +234,14 @@ module.exports = {
                     header: 'Template Name',
                     field: 'name',
                     transform: (item) => {
-                        const fn = vvSync.sanitizeFilename(item.name) + '.xml';
-                        return extractedNames.has(item.name) ? `[${item.name}](${fn})` : item.name;
+                        if (!extractedNames.has(item.name)) return item.name;
+                        const baseName = vvSync.sanitizeFilename(item.name);
+                        for (const ext of ['.xml', '.json']) {
+                            if (fs.existsSync(path.join(outputDir, baseName + ext))) {
+                                return `[${item.name}](${baseName + ext})`;
+                            }
+                        }
+                        return `[${item.name}](${baseName}.xml)`;
                     },
                 },
                 { header: 'Version', field: 'templateRevision' },
