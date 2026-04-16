@@ -2,7 +2,7 @@
 
 ## 1. Executive Summary
 
-148 tests across 10 categories (WS-1 through WS-10) exhaustively characterize how the VisualVault REST API handles dates when creating, reading, updating, and querying form records via web services. Testing covered 8 field configurations, 3 server timezones (BRT/IST/UTC), 20+ input formats, and cross-layer verification against the Forms UI.
+148 tests across 10 categories (WS-1 through WS-10) exhaustively characterize how the VisualVault REST API handles dates when creating, reading, updating, and querying form records via web services. Testing covered 8 field configurations, 3 client/runner timezones (BRT/IST/UTC), 20+ input formats, and cross-layer verification against the Forms UI.
 
 **Key findings**: The API write/read/round-trip path is reliable and timezone-independent when using string inputs. However, **6 distinct issues** were identified — 2 cause silent data loss, 2 cause datetime corruption when records cross from API to Forms, 1 is an ambiguous-format trap, and 1 is a systemic design flaw. The most critical production issue (Freshdesk #124697) was root-caused to a serialization format mismatch in the FormsAPI's `FormInstance/Controls` response between records created via `postForms` vs `forminstance/` (CB-29).
 
@@ -326,7 +326,7 @@ All 12 hypotheses from the testing plan, with final disposition.
 | H-1  | API bypasses `normalizeCalValue()` — no FORM-BUG-7 on date-only writes            | **CONFIRMED**         | CB-1 (WS-1)              | API sends strings; no client-side JS involved                                                                            |
 | H-2  | API returns raw stored value — no FORM-BUG-5 fake Z                               | **CONFIRMED**         | CB-2 (WS-2)              | API returns real Z from server normalization                                                                             |
 | H-3  | API returns `null` for empty fields — no FORM-BUG-6                               | **CONFIRMED**         | CB-3, CB-18 (WS-2, WS-6) | `null` for all empty variants; `"Invalid Date"` also → `null`                                                            |
-| H-4  | Server TZ does not affect API write — strings stored as-is                        | **CONFIRMED**         | CB-4 (WS-1)              | BRT, IST, UTC all produce identical stored values                                                                        |
+| H-4  | Client TZ does not affect API write — strings stored as-is                        | **CONFIRMED**         | CB-4 (WS-1)              | BRT, IST, UTC all produce identical stored values                                                                        |
 | H-5  | API accepts ISO 8601 and US date formats at minimum                               | **CONFIRMED**         | CB-14 (WS-5)             | Also accepts: DB format, YYYY/DD, YYYY.DD, English month, abbreviated month                                              |
 | H-6  | Date set via API displays correctly in Forms (BRT) but may show FORM-BUG-7 in IST | **PARTIALLY REFUTED** | CB-10 (WS-4)             | Date-only displays correctly in both BRT and IST. But datetime values shift (CB-8) — different mechanism than FORM-BUG-7 |
 | H-7  | Forms-saved buggy values readable via API as-is                                   | **CONFIRMED**         | CB-5 (WS-2)              | IST Config A returns `"2026-03-14T00:00:00Z"` — FORM-BUG-7 damage visible in DB                                          |
@@ -334,7 +334,7 @@ All 12 hypotheses from the testing plan, with final disposition.
 | H-9  | `postFormRevision` preserves unmentioned fields                                   | **CONFIRMED**         | CB-21 (WS-7)             | Standard partial-update behavior works correctly                                                                         |
 | H-10 | OData date filters match stored format                                            | **CONFIRMED**         | CB-22, CB-23 (WS-8)      | Query engine normalizes multiple date formats                                                                            |
 | H-11 | Date objects serialized with Z are handled differently than strings               | **CONFIRMED**         | CB-24 (WS-9)             | Z-suffixed values accepted; ms stripped. Stored correctly                                                                |
-| H-12 | US-format `new Date()` produces different API results per server TZ               | **CONFIRMED**         | CB-25 (WS-9)             | BRT=`T03:00Z`, IST=prev-day `T18:30Z`, UTC=`T00:00Z`                                                                     |
+| H-12 | US-format `new Date()` produces different API results per client TZ               | **CONFIRMED**         | CB-25 (WS-9)             | BRT=`T03:00Z`, IST=prev-day `T18:30Z`, UTC=`T00:00Z`                                                                     |
 
 **Score**: 11 confirmed, 1 partially refuted (H-6). No hypothesis was completely wrong — the test design was well-calibrated.
 

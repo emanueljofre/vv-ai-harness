@@ -30,7 +30,7 @@ research/date-handling/
 ## Key Facts
 
 - **Database**: All calendar fields are SQL Server `datetime` type (no `date` type). JS format differences translate to actual data differences in DB.
-- **VV server timezone**: BRT (UTC-3).
+- **VV server timezone**: BRT (UTC-3) on vvdemo, UTC-7 on vv5dev. Note: in the form read/write cycle the server is a passthrough (stores naive datetimes, appends `Z` on read). Shift magnitude depends on the **user's browser timezone**, not the server's. Server TZ only matters for server-generated timestamps (`DateTime.Now`, `GETDATE()`) and server-side processing.
 - **Mixed timezone storage**: Same `datetime` column contains both UTC values (from `toISOString()`) and timezone-ambiguous local values (from `getSaveValue()`).
 - **API write path**: REST API (`postForms`) stores dates uniformly — no Config C/D divergence, no FORM-BUG-7. Mixed storage is exclusively a Forms Angular pipeline issue.
 - **All 6 cross-cutting questions answered.** See `analysis/temporal-models.md`.

@@ -1,8 +1,8 @@
 # VisualVault Platform — Date Handling Known Issues
 
 **Audience**: Product management, engineering leadership, customer success
-**Last updated**: 2026-04-13
-**Validation**: 742 test executions across 2 environments with different platform versions (5.x and 6.x), UI generations, and server timezones. All issues confirmed as platform-level — identical behavior across environments.
+**Last updated**: 2026-04-16
+**Validation**: 742 test executions across 2 environments with different platform versions (5.x and 6.x), UI generations, server timezones, and multiple browser timezones (BRT, IST, UTC, PST). All issues confirmed as platform-level — identical behavior across environments.
 
 ---
 
@@ -157,15 +157,15 @@ Additionally, once a date is set on a document index field, it cannot be cleared
 
 ### Issue Summary
 
-| Issue | Affected Field Types                                              | Key Trigger                                                                                   | Consequence                                                                                  |
-| :---: | ----------------------------------------------------------------- | --------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
-|  #1   | Date-time (local time)                                            | Form-level script reads value + any non-UTC timezone. Cross-form transfers amplify the shift. | Wrong calculations; cumulative drift if written back; wrong values propagated to other forms |
-|  #2   | Date-time (local time)                                            | Record created via standard API, then opened in form + any non-UTC timezone                   | Silent corruption on first form open after API creation                                      |
-|  #3   | Date-time (timezone-aware) for functional; all types for cosmetic | Viewing same record in Forms vs Dashboard                                                     | Display confusion; different times shown for same value                                      |
-|  #4   | All types                                                         | DD/MM/YYYY format sent via API                                                                | Silent data loss or month/day swap                                                           |
-|  #5   | Date-only                                                         | Any timezone east of UTC                                                                      | Wrong calendar day stored (off by 1 day)                                                     |
-|  #6   | Date-only                                                         | Same field populated via multiple entry paths                                                 | Inconsistent internal storage; query accuracy degrades                                       |
-|  #7   | Document index fields                                             | Timezone offset in input; or any attempt to clear                                             | Timezone ambiguity; cannot clear once set                                                    |
+| Issue | Affected Field Types                                              | Key Trigger                                                                                                     | Consequence                                                                                  |
+| :---: | ----------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+|  #1   | Date-time (local time)                                            | Form-level script reads value + user's browser in any non-UTC timezone. Cross-form transfers amplify the shift. | Wrong calculations; cumulative drift if written back; wrong values propagated to other forms |
+|  #2   | Date-time (local time)                                            | Record created via standard API, then opened in form + user's browser in any non-UTC timezone                   | Silent corruption on first form open after API creation                                      |
+|  #3   | Date-time (timezone-aware) for functional; all types for cosmetic | Viewing same record in Forms vs Dashboard                                                                       | Display confusion; different times shown for same value                                      |
+|  #4   | All types                                                         | DD/MM/YYYY format sent via API                                                                                  | Silent data loss or month/day swap                                                           |
+|  #5   | Date-only                                                         | User's browser in any timezone east of UTC                                                                      | Wrong calendar day stored (off by 1 day)                                                     |
+|  #6   | Date-only                                                         | Same field populated via multiple entry paths                                                                   | Inconsistent internal storage; query accuracy degrades                                       |
+|  #7   | Document index fields                                             | Timezone offset in input; or any attempt to clear                                                               | Timezone ambiguity; cannot clear once set                                                    |
 
 ---
 
@@ -173,19 +173,20 @@ Additionally, once a date is set on a document index field, it cannot be cleared
 
 ### WADNR Profile
 
-| Parameter                                              | Value                                           |
-| ------------------------------------------------------ | ----------------------------------------------- |
-| Server timezone                                        | UTC-7 (Pacific Time, fixed — no DST adjustment) |
-| Total date fields                                      | 137 across 35 form templates                    |
-| Date-only fields                                       | 122 (89%)                                       |
-| Date-time (local time) fields                          | 12 (9%)                                         |
-| Date-time (timezone-aware) fields                      | 3 (2%)                                          |
-| Legacy field configurations                            | 0                                               |
-| Form scripts interacting with date fields              | 49 out of 3,560 total                           |
-| Form scripts reading date-time (local time) fields     | 3                                               |
-| Form script read-write round-trips on date-time fields | 0                                               |
-| Date format in use                                     | US (MM/DD/YYYY) exclusively                     |
-| Date formats observed in extracted scripts             | US (MM/DD/YYYY)                                 |
+| Parameter                                              | Value                                             |
+| ------------------------------------------------------ | ------------------------------------------------- |
+| Server timezone                                        | UTC-7 (Pacific Time, fixed — no DST adjustment)   |
+| Primary user timezone                                  | US Pacific (UTC-8 PST / UTC-7 PDT — observes DST) |
+| Total date fields                                      | 137 across 35 form templates                      |
+| Date-only fields                                       | 122 (89%)                                         |
+| Date-time (local time) fields                          | 12 (9%)                                           |
+| Date-time (timezone-aware) fields                      | 3 (2%)                                            |
+| Legacy field configurations                            | 0                                                 |
+| Form scripts interacting with date fields              | 49 out of 3,560 total                             |
+| Form scripts reading date-time (local time) fields     | 3                                                 |
+| Form script read-write round-trips on date-time fields | 0                                                 |
+| Date format in use                                     | US (MM/DD/YYYY) exclusively                       |
+| Date formats observed in extracted scripts             | US (MM/DD/YYYY)                                   |
 
 ### Issue-by-Issue Assessment
 
@@ -195,9 +196,11 @@ Additionally, once a date is set on a document index field, it cannot be cleared
 |  #2   | Date-time (local time) + standard API + non-UTC    |     **Partially**: 12 fields exposed, but a workaround (alternative endpoint) is known     | **Mitigated**  |
 |  #3   | Date-time (timezone-aware) for functional mismatch |                        **Minimally**: only 3 timezone-aware fields                         | **Negligible** |
 |  #4   | DD/MM/YYYY input via API                           | **Not observed**: extracted scripts use US format only. External integrations not audited. |    **Low**     |
-|  #5   | Date-only + east of UTC                            |                                **No**: UTC-7 is west of UTC                                |    **Zero**    |
+|  #5   | Date-only + user's browser east of UTC             |              **No**: WADNR users are in US Pacific (UTC-7/UTC-8), west of UTC              |    **Zero**    |
 |  #6   | Date-only + multiple entry paths                   |      **Marginally**: 122 date-only fields, but entry paths produce consistent values       |  **Very low**  |
 |  #7   | Document Library API + timezone data               |        **Unknown**: 1 automation writes index fields; code review shows no TZ data         |  **Unknown**   |
+
+> **Server timezone vs. browser timezone**: In the form read/write cycle, the server acts as a passthrough — it stores naive datetimes and blindly appends `Z` on read. The shift magnitude for Issues #1, #2, and #5 is determined by the **user's browser timezone**, not the server's. The server timezone (UTC-7) only matters for server-generated timestamps (created/modified dates, audit fields) and server-side processing (scheduled processes, web service logic using `DateTime.Now` or `GETDATE()`). WADNR's immunity to Issue #5 is because their **users** are in US Pacific (west of UTC), not because the server is UTC-7.
 
 ### The 12 Date-Time (Local Time) Fields — WADNR's Primary Exposure
 
@@ -309,7 +312,7 @@ Root cause and fix strategy: `analysis/temporal-models.md`, `analysis/fix-strate
 
 ## Methodology
 
-- **742 automated test executions** across 2 VV environments with different platform versions (5.x and 6.x), UI generations, and server timezones (UTC-3 and UTC-7)
+- **742 automated test executions** across 2 VV environments with different platform versions (5.x and 6.x), UI generations, and server timezones (UTC-3 and UTC-7). Browser timezone varied independently (BRT, IST, UTC, PST) to isolate client-side vs. server-side effects.
 - **Automated field inventory** of 77 WADNR form templates — 137 date fields classified by type, configuration, and risk
 - **Automated script inventory** of 3,560 WADNR automations — 49 with date field interactions mapped to specific issue exposure
 - **Support ticket analysis** with root causes traced to platform-level issues
