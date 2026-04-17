@@ -103,6 +103,16 @@ https://{env}.visualvault.com/app/{customer}/{database}/DocumentDetails?DhID={do
 - Contains 11 tabs: Details, Parent, Children, Related, Forms, Projects, ID Card, **Index Fields**, Revisions, History, Security
 - Index Fields tab shows editable date/text/dropdown fields when document is checked out
 
+### Public Portal
+
+Anonymous public-facing forms are served from a parallel `/Public/*` URL path that mirrors `/app/*` but requires no authentication. Customers expose individual forms (permit applications, intake, public submissions) through this namespace without granting site accounts to external users.
+
+```
+https://{env}.visualvault.com/Public/form_details?formid={revisionGUID}&...
+```
+
+Public users are authenticated as a system user literally named `"public"`. Client scripts detect the mode via `sessionStorage.UserInfo.name.toLowerCase() === "public"` and rewrite `/app` → `/Public` in any URL they generate so the link lands in the correct namespace. Example: `VV.Form.Global.FillinAndRelateForm` performs this rewrite before building its target URL (verified in the global function source, 2026-04-16).
+
 ---
 
 ## Navigation Map
