@@ -3,12 +3,14 @@
 | Field              | Value                                                                                                         |
 | ------------------ | ------------------------------------------------------------------------------------------------------------- |
 | **Prepared by**    | Emanuel Jofré — Solution Architecture                                                                          |
-| **Date**           | 2026-04-16                                                                                                    |
-| **Phase**          | 1 (BRT/IST evidence proxied to PST/EST/UTC; Phase 2 will backfill with native PST/EST runs — see Part 8)      |
+| **Date**           | 2026-04-17 (rev 2 — Phase 2 discovery gaps A1/A2/A3 closed, risk register re-ordered by PST-weighted real impact) |
+| **Phase**          | Phase 2 partially closed (8.3 FillinAndRelateForm ✓, 8.4 Doc Library ✓, 8.1/8.2 native PST/EST runs deferred) |
 | **Audience**       | Engineering and architecture leadership                                                                        |
 | **Distribution**   | Internal. Suitable to ship as-is to VV Product / Engineering if escalated.                                    |
 | **Environment**    | vv5dev / WADNR / fpOnline · Platform 6.1.20240711.1 · Server UTC-7 · FormViewer v0.5.1 (build 20260404.1)     |
+| **Washington TZ**  | Primary population is Pacific (PST/PDT, UTC-8/-7). This drives the "real impact" weighting throughout the report — bugs that trigger only for UTC+ users (i.e. FORM-BUG-7) are dormant. Two secondary populations access the system from other US TZs: WADNR staff traveling out of state, and external applicants / businesses submitting permits from anywhere in the country. See Part 5.2 for cross-TZ scenarios (qualitative — volume unknown). |
 | **Investigation**  | [`research/date-handling/`](../../../research/date-handling/) — 16 confirmed platform bugs, 4 temporal models |
+| **Phase 2 annex**  | [`fillin-and-relate-form-audit.md`](fillin-and-relate-form-audit.md) · [`document-library-date-exposure.md`](document-library-date-exposure.md) · [`config-d-field-usage.md`](config-d-field-usage.md) |
 
 ---
 
@@ -26,6 +28,14 @@
 
 All cross-references use relative paths from this file. Every claim has a citation of the form `[src: path#section]`.
 
+## Revision log
+
+| Date | Change |
+|---|---|
+| 2026-04-16 | Initial rev 1 — full 8-part report with 11-layer catalogue, per-config scenarios, and 9-row risk register |
+| 2026-04-17 | Rev 2 — Phase 2 discovery gaps closed (A1 FillinAndRelateForm audit, A2 Doc Library exposure, A3 Config D field-use validation). Risk register re-ordered by PST-weighted WADNR real impact. Part 6.2 recommendations restructured: the "reconfigure 8 fields to Config B" track is refuted for 7 of 8 fields by production data; platform escalation becomes the central remediation path. Three new annex documents linked in the header. |
+| 2026-04-17 (rev 2.1) | Added Part 5.2 (Cross-TZ access scenarios) covering US-domestic travel and non-Washington applicants qualitatively. Added Part 8.6 follow-up to quantify cross-TZ access volume. Annotated Risk #1 with cross-TZ caveat. FORM-BUG-7 remains dormant (US is all UTC-negative). |
+
 ---
 
 # Part 0 — Executive Summary
@@ -34,19 +44,29 @@ All cross-references use relative paths from this file. Every claim has a citati
 
 **Testing validates that WADNR behaves identically to the baseline environment.** There are no WADNR-specific date bugs. All issues are platform defects common to every VV customer running the same version. [src: `testing/date-handling/status.md`]
 
-## Top-5 risks, prioritized
+## Top-5 risks — ordered by WADNR real impact (PST-weighted)
 
-| # | Risk                                                                                                                                                         | Layer(s)                                  | Status                                                                                                 | WADNR surface                                                 |
-| - | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------- | ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------- |
-| 1 | **Freshdesk #124697 (WADNR-10407)** — `postForms` writes Config D value correctly; on first form open the browser re-parses and shifts; save commits drift. | REST API serialization + Form JS load    | **Active in production.** Workaround: use `forminstance/` endpoint for legacy-data migration.         | All 12 Config D fields across 8 form templates.               |
-| 2 | **FORM-BUG-5 drift on script round-trip** — `GetFieldValue` → `SetFieldValue` on a Config D field shifts the value by the user's UTC offset, per trip.       | Dev API (`GetFieldValue` / `SetFieldValue`) | Reproducible in every timezone except UTC+0. **No WADNR template scripts currently do GFV→SFV** on D fields; site-level `FillinAndRelateForm` is uninspected. | All 12 Config D fields if a script round-trip is introduced.  |
-| 3 | **Mixed-TZ storage accretion** — same `fpOnline` column holds UTC-normalized values (from UI with `ignoreTimezone=false`) and naive-local values (from `postForms` / Config D UI). | SQL Server `datetime` + server storage    | **Structural, ongoing.** Every new record widens the mix.                                              | All date columns. Affects date-range queries and dashboards.  |
-| 4 | **8 misconfigured Config D fields** — `"Date of Receipt"`, `"Received Date"`, `"Date Created"`, `"Date of Violation"` etc. are configured with `enableTime=true` but names indicate date-only semantics. | Form template definition                 | Configuration error. Not a platform bug.                                                               | 8 specific fields across 7 templates (Appendix B).            |
-| 5 | **FORM-BUG-7 — date-only wrong day for UTC+ users** — 122 Config B fields store the previous day for any user east of UTC.                                   | Form JS input parsing (`normalizeCalValue`) | **Dormant**: WADNR staff are Pacific (UTC-7/-8). Would activate for UTC+ contractors, travelers, or legacy-source migrations that carried UTC+ semantics. | All 122 date-only fields; latent risk.                        |
+Real-impact ranking combines severity × live-exposure × PST-context. Platform bugs that only trigger for UTC+ users are dormant for WADNR and drop out of the top 5.
+
+| # | Risk | Layer(s) | Real impact | WADNR surface |
+|---|------|----------|-------------|---------------|
+| 1 | **Freshdesk #124697 (WADNR-10407)** — `postForms` writes Config D value correctly; on first form open the browser re-parses and shifts; save commits drift. | REST API serialization + Form JS load | **HIGH — active in production.** `forminstance/` workaround addresses migration writes only. UI reads and `getForms` downstream still return the fake-Z value. Shift magnitude varies with viewer TZ — see Part 5.2. | All 12 Config D fields. **A3 update**: 9 of 12 fields carry meaningful user-entered time (see Appendix B); they are the highest-value remediation target. **Cross-TZ caveat**: exposure includes traveling staff and out-of-state public applicants (Part 5.2). |
+| 2 | **FORM-BUG-5 drift on script round-trip** — `GetFieldValue → SetFieldValue` on a Config D field shifts the value by the user's UTC offset per trip. | Dev API (`GetFieldValue` / `SetFieldValue`) | **MEDIUM — latent, not live.** **A1 update**: `FillinAndRelateForm` (36-template site-level function) audited and cleared. No template script does GFV→SFV on a Config D field today. Forward-looking risk only. | 12 Config D fields if a round-trip pattern is introduced. |
+| 3 | **Mixed-TZ storage accretion** — same `fpOnline` column holds UTC-normalized values (from UI with `ignoreTimezone=false`) and naive-local values (from `postForms` / Config D UI). | SQL Server `datetime` + server storage | **MEDIUM — structural, ongoing.** Every new record widens the mix. Dashboards and date-range queries already return inconsistent results in practice. | All Config C + Config D columns. |
+| 4 | **Config D reconfiguration premise refuted** — only 1 of 8 "misconfigured" fields (`Forest Practices Application Notification / Date of Receipt`) is safe to reconfigure to Config B. The other 7 carry meaningful time data that users actively enter. | Form template definition + production data | **HIGH — reframes the remediation path.** The "reconfigure 8 fields" track in prior revision is largely not viable. 9 retained Config D fields stay exposed to #124697 chain until platform fix. | See Appendix B.2/B.3/B.4 (revised 2026-04-17 with A3 per-field evidence). |
+| 5 | **FORMDASHBOARD-BUG-1 / XLAYER-7** — Config C Form ↔ Dashboard display divergence. Forms show viewer-local time; Dashboards show raw UTC. Same record appears as different times. | Dashboard render | **MEDIUM — active, cosmetic-to-interpretive.** 3 Config C fields affected. Users comparing Form view vs. Dashboard see different times for the same record. Not a data-corruption bug. | 3 Config C fields (system timestamps). |
+
+**Dropped from Top-5 after PST re-weighting (2026-04-17):**
+
+- **FORM-BUG-7 (UTC+ day shift)** — HIGH severity but **dormant at WADNR** (all staff Pacific; continental US travel stays UTC-negative). Latent risk only if a UTC+ user (overseas contractor, international applicant) ever touches a Config B field or a migration imports UTC+ timestamps. Remains in Part 6.1 at LOW real impact.
+- **WS-BUG-2/3 (DD/MM + ambiguous date parsing)** — HIGH severity platform-wide but **not applicable at WADNR** (no LATAM date formats in use; all WS calls confirmed to use US format or ISO). LOW real impact.
+- **DOC-BUG-1/2 (Document Library index fields)** — HIGH severity platform-wide but **zero exposure at WADNR** per A2 (no date-type index fields in use).
+
+**Cross-TZ caveat (new 2026-04-17):** the Top-5 assumes the primary access population is Pacific. Staff traveling out of state and external applicants submitting from other US TZs change the *magnitude* of the #124697 shift but do not activate new bug classes (all US TZs are UTC-negative, so FORM-BUG-7 stays dormant). Impact is qualitative until cross-TZ access volumes are quantified — see Part 5.2.
 
 ## Exposure in one paragraph
 
-A single date value in WADNR can traverse up to **11 distinct transformation points** between user keystroke and database row, and between database row and rendered display. Five of these layers are known mutation points (places where the value or its semantics change without a warning). The platform has no per-row metadata to identify *which* temporal model a stored `datetime` represents — so the same column accumulates Calendar Date, Instant, and Pinned/Floating values mixed together, each serialized and rendered under whatever convention the reading endpoint happens to apply. WADNR's `fpOnline` database is inside this regime; one active support ticket (#124697) has already exposed the problem, the workaround addresses only one of three affected stages, and future WADNR records created via the standard `postForms` endpoint or via `VV.Form.Global.FillinAndRelateForm` site-level chains remain exposed. [src: `research/date-handling/analysis/temporal-models.md#5-how-bugs-compound-across-layers`]
+A single date value in WADNR can traverse up to **11 distinct transformation points** between user keystroke and database row, and between database row and rendered display. Five of these layers are known mutation points (places where the value or its semantics change without a warning). The platform has no per-row metadata to identify *which* temporal model a stored `datetime` represents — so the same column accumulates Calendar Date, Instant, and Pinned/Floating values mixed together, each serialized and rendered under whatever convention the reading endpoint happens to apply. WADNR's `fpOnline` database is inside this regime; one active support ticket (#124697) has already exposed the problem, the `forminstance/` workaround addresses only one of three affected stages, and future WADNR records created via the standard `postForms` endpoint remain exposed. The `FillinAndRelateForm` site-level chain (A1, 2026-04-17) was previously flagged as a potential drift amplifier but is cleared — no live script passes a Config D calendar value through it. [src: `research/date-handling/analysis/temporal-models.md#5-how-bugs-compound-across-layers`, `fillin-and-relate-form-audit.md`]
 
 ## What's been validated
 
@@ -59,12 +79,21 @@ A single date value in WADNR can traverse up to **11 distinct transformation poi
 
 [src: `testing/date-handling/status.md`]
 
-## What to do
+## What to do (revised 2026-04-17)
 
-- **Keep the `forminstance/` workaround** for ongoing legacy-data migration (#124697 root-mitigation).
-- **Audit the 8 misconfigured Config D fields** (Appendix B, Table B.2) and decide per-field whether to reconfigure to B. Reconfiguration is a write to each form template; it is **not** a data-migration problem (existing records retain their time component in the column but it is hidden by the UI).
-- **Ban `GetFieldValue → SetFieldValue` round-trips on Config D fields** in any new template script, and inspect `VV.Form.Global.FillinAndRelateForm` (site-level, currently un-audited, used in 36 templates).
-- **Escalate to VV Engineering** with the `platform-date-bugs-summary.md` and `temporal-models.md` documents — the issues are architectural and the fix is coordinated across storage, serialization, form JS, and render layers.
+Ordered by WADNR real-impact leverage. Bold indicates the most load-bearing actions.
+
+1. **Escalate to VV Engineering — the central path.** Per A3, 9 of 12 Config D fields carry meaningful time data and cannot be reconfigured to Config B without losing user input. The only permanent remediation is platform-level fixes to FORM-BUG-1 (`initCalendarValueV1` Z-stripping), FORM-BUG-5 (`GetFieldValue` fake `[Z]`), and WS-BUG-1 (`FormInstance/Controls` Z injection). Handoff package: `platform-date-bugs-summary.md` + `temporal-models.md` + `fix-strategy.md` + this current-state + `case-study-124697.md`.
+2. **Keep the `forminstance/` workaround** for every migration and SDK integration. Addresses Stage 1 of the #124697 chain. Only works for writes; UI reads still shift.
+3. **Reconfigure 1 field** (`Forest Practices Application Notification / Date of Receipt`, 35 populated records all midnight — verified 2026-04-17 via A3). Safe reconfiguration to Config B eliminates #124697 chain exposure for this one field. All other "misconfigured" fields retain their Config D until platform fix lands.
+4. **Investigate 2 fields** with WADNR SMEs: `Multi-purpose / Date of Violation` (29% non-midnight — mixed use) and `Informal Conference Note - SUPPORT COPY / Meeting Date` (0 records — template may be deprecated).
+5. **Ban `GetFieldValue → SetFieldValue` round-trips on Config D fields** in code review. Forward-looking control — A1 confirms no such pattern exists today, but 36 templates use the `FillinAndRelateForm` call chain where this pattern could be introduced easily.
+6. **Script audit for FORM-BUG-6 defensive checks.** 3 templates already check `=== 'Invalid Date'` on a Config D `GetFieldValue` result; any new script should use the same guard or a safer API like `VV.Form.VV.FormPartition.getValueObjectValue`.
+
+**No longer required (closed by A1/A2):**
+
+- ~~Audit `FillinAndRelateForm`~~ — complete. No live FORM-BUG-5 exposure. See `fillin-and-relate-form-audit.md`.
+- ~~Assess Document Library exposure~~ — complete. No date-type index fields in use. See `document-library-date-exposure.md`.
 
 ---
 
@@ -144,24 +173,24 @@ Every date/time use case in VV maps to exactly one of four models. The platform 
 | **A**  |    false     |      false       |    false    | 1 — Calendar Date      |            3 |       2.2% |               100% |
 | **B**  |    false     |      **true**    |    false    | 1 — Calendar Date      |        **119** |   **86.9%** |               ~95% (5 `Status Updated At` fields likely should be C) |
 | **C**  |    **true**  |      false       |    false    | 2 — Instant            |            3 |       2.2% |               67% (1 ambiguous) |
-| **D**  |    **true**  |      **true**    |    false    | 3/4 — Pinned/Floating  |       **12** |       8.8% |               33% (**8 likely mis-configured**, should be B) |
+| **D**  |    **true**  |      **true**    |    false    | 3/4 — Pinned/Floating  |       **12** |       8.8% |               See A3 (2026-04-17): only 1 field safe to reconfigure; 9 actually store user-entered time; 2 ambiguous |
 | E/F/G/H | —            | —                | true        | (legacy variants)       |            0 |       0.0% | —                 |
 | **Total** |           |                  |             |                        |      **137** |     100%   |                    |
 
-**Critical callout — the 8 misconfigured Config D fields** (names indicate date-only semantics but `enableTime=true` is set):
+**Critical callout — the 8 name-mismatched Config D fields** (field names suggest date-only semantics but `enableTime=true` is set):
 
-| Form template                                     | Field name                   |
-| ------------------------------------------------- | ---------------------------- |
-| Forest-Practices-Aerial-Chemical-Application       | `Received Date`              |
-| Forest-Practices-Application-Notification          | `Date of Receipt`            |
-| FPAN-Amendment-Request                             | `Date of Receipt`            |
-| FPAN-Renewal                                       | `Date of Receipt`            |
-| Long-Term-Application-5-Day-Notice                 | `Date of Receipt`            |
-| Multi-purpose                                      | `Date of Violation`          |
-| Step-1-Long-Term-FPA                               | `Date of Receipt`            |
-| Task                                               | `Date Created`               |
+| Form template                                     | Field name                   | A3 disposition (2026-04-17) |
+| ------------------------------------------------- | ---------------------------- | ---------------------------- |
+| Forest-Practices-Aerial-Chemical-Application       | `Received Date`              | reconfig-risky (80% time)    |
+| Forest-Practices-Application-Notification          | `Date of Receipt`            | **reconfig-safe** (0% time) ← only safe field |
+| FPAN-Amendment-Request                             | `Date of Receipt`            | reconfig-risky (89% time)    |
+| FPAN-Renewal                                       | `Date of Receipt`            | reconfig-risky (71% time)    |
+| Long-Term-Application-5-Day-Notice                 | `Date of Receipt`            | reconfig-risky (77% time)    |
+| Multi-purpose                                      | `Date of Violation`          | investigate (29% time)       |
+| Step-1-Long-Term-FPA                               | `Date of Receipt`            | reconfig-risky (67% time)    |
+| Task                                               | `Date Created`               | reconfig-risky (100% time)   |
 
-These 8 fields are the primary attack surface for #124697. Full list with all 12 Config D fields in Appendix B. [src: `analysis/bug-analysis/case-study-124697.md#2-production-fields`]
+**A3 finding (2026-04-17)**: the "reconfigure-to-B" intuition based on names does not survive contact with production data. 7 of 8 fields carry meaningful user-entered time. These 8 fields remain the primary attack surface for #124697, but the remediation path shifts from client-side reconfiguration to platform fix. See [`config-d-field-usage.md`](config-d-field-usage.md) and Appendix B.2. Full list with all 12 Config D fields in Appendix B. [src: `analysis/bug-analysis/case-study-124697.md#2-production-fields`]
 
 ## 2.2 What each config means, in plain English
 
@@ -176,7 +205,7 @@ These 8 fields are the primary attack surface for #124697. Full list with all 12
 | FORM-BUG-1   | Z stripped on form load (Config D/H only)                              |  MED–HI  |    —       |    —       | **YES**    | **Active** (stage 2 of #124697).        |
 | FORM-BUG-3   | V2 hardcoded params (code-only)                                        |   MED    |   code     |   code     |   code     | V2 not activated — inert at WADNR.      |
 | FORM-BUG-4   | `getSaveValue` strips Z on save                                        |   MED    |    —       |   code     |   code     | Self-consistent within a single user/zone; surfaces on cross-TZ or mixed-endpoint reads. |
-| FORM-BUG-5   | Fake literal `[Z]` in `GetFieldValue` (Config D only)                  |  **HIGH**|    —       |    —       | **YES**    | **Active** if any script does GFV→SFV. No template-level round-trips found; `FillinAndRelateForm` uninspected. |
+| FORM-BUG-5   | Fake literal `[Z]` in `GetFieldValue` (Config D only)                  |  **HIGH**|    —       |    —       | **YES**    | **Latent** (A1, 2026-04-17) — no template-level GFV→SFV round-trips, `FillinAndRelateForm` chain cleared. Forward-looking risk only. |
 | FORM-BUG-6   | Empty Config C/D returns `"Invalid Date"` from `GetFieldValue`          |   MED    |    —       |  **YES**   |  **YES**   | Any script that checks "is this field empty" via GFV will mis-classify. |
 | FORM-BUG-7   | Date-only stored as previous day for UTC+ users                        |  **HIGH**| **YES**    |    —       |    —       | **Dormant** (WADNR staff UTC-7/-8). Would activate for UTC+ users/migrations. |
 | WS-BUG-1/CB-29 | `getForms` appends Z to all dates (false UTC marker)                 |   HIGH   | indirect   | indirect   | **YES**    | **Active** — drives #124697 stage 1.    |
@@ -184,7 +213,7 @@ These 8 fields are the primary attack surface for #124697. Full list with all 12
 | WS-BUG-5     | Time component silently truncated for some formats                     |   MED    |    —       |  YES       |  YES       | Active on Cat 10 runs.                  |
 | WS-BUG-6     | Date-only fields accept time components (no enforcement)               |   MED    |  YES       |    —       |    —       | Active — allows mis-configured data.    |
 | FORMDASHBOARD-BUG-1 | Dashboard shows raw DB value; Forms converts (Config C only)    |   MED    |    —       |  **YES**   |    —       | Active on 3 Config C fields.            |
-| DOC-BUG-1/2  | Document Library index field: TZ-to-UTC conversion + can't clear       |   HIGH/MED |    ?       |    ?       |    ?       | Exposure unknown — no WADNR harness yet. |
+| DOC-BUG-1/2  | Document Library index field: TZ-to-UTC conversion + can't clear       |   HIGH/MED |    —       |    —       |    —       | **Zero exposure** (A2, 2026-04-17): no date-type index fields on WADNR library. |
 
 Legend: `YES` = confirmed live in WADNR, `code` = confirmed in source, not live-reproduced, `—` = not applicable, `indirect` = triggers via a downstream chain.
 
@@ -913,45 +942,162 @@ The `fpOnline` DB column for any WADNR Config C field can contain **side-by-side
 
 Rows A and B both represent "2:30 PM" in the writer's mind, but the stored values differ by 7 hours. SQL queries such as `WHERE d = '2026-03-15T14:30:00'` return B and C but miss A. Dashboards aggregating by hour will split these into different buckets. [src: `consistency-matrix.md` §Mixed Storage]
 
----
+## 5.2 Cross-TZ access scenarios (US domestic)
 
-# Part 6 — Risk Register & Recommendations
+The PST-weighted ranking elsewhere in this report assumes all access happens at UTC-8/-7. That holds for most reads and writes on the WADNR environment, but **two populations break the assumption even when only the continental US is involved**:
 
-## 6.1 Risk register (prioritized)
+1. **WADNR staff traveling outside Pacific.** Field reps, on-site visits, training, conferences. Frequency unknown.
+2. **External applicants / businesses submitting or updating records from outside Washington.** WADNR's Forms include public-facing applications (FPAN, Long-Term FPA, Aerial Chemical Application, Transfer, Renewal, Amendment Request) — out-of-state forestry operators, timber owners, and operators can lawfully submit from any US TZ. The `FillinAndRelateForm` global function has an explicit `/Public` path, confirming a public-portal workflow exists. Frequency unknown; likely larger than internal-staff travel.
 
-| # | Risk                                                                                                                     | Layer(s)                                 | Likelihood            | Impact                                                                          | WADNR surface                                               | Short-term mitigation                                                                                                | Long-term fix                                                                 |
-| - | ------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------- | --------------------- | ------------------------------------------------------------------------------- | ----------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
-| 1 | **#124697 — `postForms` time mutation on first open+save** for Config D                                                  | REST API serialize + Form JS load + save | **Certain** for affected integrations | **HIGH** — permanent DB corruption; time shifts by user's offset              | All 12 Config D fields; imports, script integrations        | Use `forminstance/` endpoint for writes. Avoid opening+saving API-created records without edits.                     | VV: align `getForms` serialization with `forminstance/`; fix `initCalendarValueV1`. |
-| 2 | **FORM-BUG-5 drift on script GFV→SFV round-trip** for Config D                                                           | Dev API                                  | Medium                | **HIGH** — progressive drift, single trip can cross year boundary                | All 12 Config D fields; any new script pattern             | Ban `GFV → SFV` on Config D in code review. Audit `FillinAndRelateForm` (site-level, 36 templates).                  | VV: fix `GetFieldValue` to not append fake `[Z]`.                              |
-| 3 | **Mixed-TZ storage accretion** — Config C column contains both UTC and naive rows                                         | Server storage + DB                      | Certain               | MEDIUM — dashboards, queries, and reports return inconsistent results           | 3 Config C fields                                           | Document which integrations write these fields and via which endpoint. Audit dashboards for TZ assumptions.           | VV: store TZ metadata (datetimeoffset column or anchor TZ column).             |
-| 4 | **8 misconfigured Config D fields** with date-only field names but `enableTime=true`                                     | Form template definition                 | Certain               | MEDIUM — every #124697 chain, plus spurious time pickers in UI                  | 8 specific fields (see Appendix B Table B.2)                | Per-field: verify whether time is used; reconfigure to Config B where not.                                           | N/A (not a platform bug).                                                      |
-| 5 | **FORM-BUG-7 latent for UTC+ users** — 122 date-only fields store previous day                                            | Form JS input parse                      | Low (currently)       | HIGH if any UTC+ user touches WADNR                                             | 122 Config A/B fields                                       | Monitor user locations. Warn UTC+ contractors. Migration scripts: validate day alignment post-import.                  | VV: fix `normalizeCalValue` to not route through UTC midnight.                 |
-| 6 | **XLAYER-7 — Config C Form ↔ Dashboard display mismatch**                                                                 | Dashboard render                         | Certain               | MEDIUM — cosmetic/interpretive confusion                                        | 3 Config C fields                                           | Document clearly in dashboards what TZ is shown. Prefer showing with `Z` label.                                       | VV: apply viewer-TZ conversion in Dashboard for Config C fields.                |
-| 7 | **FORM-BUG-6 — empty Config C/D returns "Invalid Date"** instead of `""` from GFV                                        | Dev API                                  | Certain               | LOW unless scripts check for empty                                              | 15 Config C+D fields; any script that reads them            | Update scripts to check for `"Invalid Date"` / `!Date.parse(val)` instead of `=== ""`.                                | VV: return `""` for empty DateTime fields.                                     |
-| 8 | **Doc Library DOC-BUG-1/2 exposure unknown**                                                                             | Doc Library index                        | Unknown               | HIGH if WADNR uses date index fields on documents                                 | Unknown — no harness yet                                     | Run one-time audit: do any WADNR documents use date index fields? If yes, scope impact.                              | VV: fix DOC-BUG-1 offset handling; DOC-BUG-2 empty writes.                      |
-| 9 | **`FillinAndRelateForm` un-audited** — site-level, 36 templates                                                           | Dev API + site JS                        | Unknown               | HIGH if any chain passes Config D values                                         | 36 templates                                                | Code-audit the site-level function definition. Map chains that touch Config D fields.                                  | N/A — audit.                                                                  |
+The rest of this section walks what *does* and *does not* change when either population accesses the system from a non-Pacific US timezone. **Impact sizing is intentionally qualitative — no access-log or travel-pattern data is in hand.** Part 8 lists this as a Phase 3 follow-up.
 
-## 6.2 Recommendations
+### What does NOT change under US-domestic travel
+
+- **FORM-BUG-7 stays dormant.** All continental US TZs are UTC-negative (PST/MST/CST/EST span UTC-8 to UTC-4). FORM-BUG-7 only activates at UTC-positive offsets. The 122 Config B date-only fields are unaffected regardless of which US TZ the user is in.
+- **Config B (119 fields, 86.9% of calendar fields) is unaffected.** Date-only + `ignoreTimezone=true` semantics mean the stored value is exactly the calendar date the user typed — no TZ math.
+- **Core bug mechanics are unchanged.** FORM-BUG-1 / FORM-BUG-5 / WS-BUG-1 still fire on Config D fields; travel doesn't introduce new bugs, only changes the *magnitude* of the existing ones.
+- **Dashboard rendering is unchanged.** Dashboards read raw stored UTC; they ignore the viewer's TZ. A traveling staff member sees the same Dashboard value as a colleague at home.
+
+### What DOES change under US-domestic travel
+
+The viewer's local TZ offset enters the #124697 chain at two places: (a) the Stage 2 load shift (FORM-BUG-1), and (b) any `GetFieldValue` / Forms UI display of a Config D value. Because shift magnitude = viewer offset, **the same stored record can appear as a different wall-clock time for each viewer**, and a traveling user who re-saves a Config D record locks in a different corruption than a home-user would.
+
+Five concrete scenarios illustrate the matrix. All assume Config D fields (the only ones affected).
+
+#### T1 — Traveling WADNR staff opens + saves a `postForms`-created Config D record
+
+Setup: migration (or any `postForms` call) wrote `2026-03-15 14:30:00` to a Config D field. A WADNR reviewer is in DC for a conference.
+
+1. Reviewer opens the record in the browser (EDT, UTC-4).
+2. `FormInstance/Controls` serializes `2026-03-15T14:30:00Z` (WS-BUG-1 / CB-29).
+3. `initCalendarValueV1` strips `Z`, re-parses as local → displayed as `2026-03-15 10:30 AM EDT` (a ~4h shift, not the ~7–8h a Pacific peer would see).
+4. Reviewer saves the form (even without edits). DB is now `2026-03-15 10:30:00` — permanent corruption, and the corruption magnitude *depends on where the reviewer was physically sitting*.
+
+**Divergence**: A PST peer opening the same record the next day would see the already-shifted 10:30 value and potentially shift it further on save. Two different reviewers on the same record can each lock in a different corrupted value.
+
+#### T2 — Traveling WADNR staff creates a Config D record via UI
+
+Setup: field rep is on a site visit in Montana (MDT, UTC-6). Creates a new `Notice-to-Comply` record (ViolationDateAndTime field, Config D).
+
+1. Rep picks "10:00 AM" in the picker.
+2. Config D has `ignoreTimezone=true`; the UI stores the wall-clock value naively → DB gets `…T10:00:00` (no TZ math).
+3. A PST reviewer later opens the record. The UI shows `10:00 AM` in their browser (naive display).
+4. Dashboard shows `10:00 AM` raw.
+
+This path looks benign — the wall-clock the rep typed is what everyone sees. **But** semantic meaning ("the violation occurred at 10 AM Mountain") is lost the moment the record leaves the rep's browser. A PST reviewer reading `10:00 AM` assumes local. There is no per-row metadata to distinguish.
+
+#### T3 — Traveling WADNR staff creates a Config C record via UI
+
+Setup: same scenario but a Config C field (3 exist: the "Status Updated At" timestamps).
+
+1. Config C has `ignoreTimezone=false`; the UI converts local→UTC on save using the traveler's TZ.
+2. "10:00 AM MDT" → stored `2026-03-15T16:00:00Z`.
+3. PST peer opens the record: UI shows `09:00 AM PDT` (correct local equivalent of the same UTC instant).
+4. Dashboard shows `16:00 UTC` raw (per XLAYER-7).
+
+This is the intended Config C behavior — correct UTC normalization. But it sharpens XLAYER-7: travelers and home staff see different wall-clock values for the same record even before bugs get involved. Not a bug; a feature working as designed, creating interpretive ambiguity under cross-TZ access.
+
+#### T4 — Non-Washington applicant submits a new permit from outside PST
+
+Setup: an out-of-state forestry operator in New York submits an FPAN Amendment Request via the public portal. They enter `Date of Receipt` (Config D, 89% of populated records carry time per A3) as today, 9:00 AM.
+
+1. Public UI writes naive `2026-04-17T09:00:00` to DB (Config D ignoreTZ path).
+2. A WADNR reviewer in Olympia opens the record next day from PST.
+3. The Stage 2 shift still runs *on load* because the UI doesn't track who wrote it. If the record was created via the public UI path (not `postForms`), the shift may not trigger; if it was created via any API-adjacent path with a Z marker, it does. Current evidence: UI-created Config D records don't go through the Z-stripping chain (that's a `postForms`-only path). So the most likely outcome is that the reviewer sees `09:00 AM` naive.
+4. **However**, if the applicant's submission goes through any wrapper that round-trips via `getForms` (e.g. workflow scripts that re-read the submission and re-save), the `Z`-appending bug applies and the value shifts by the reviewer's offset.
+
+The safe read of T4: **UI-direct submissions are probably safe; any integration-assisted or workflow-re-read path re-enters the #124697 chain with the reviewer's TZ offset as the shift magnitude**. We don't currently know which WADNR workflows re-read freshly-submitted public records.
+
+#### T5 — Applicant reads back their own submitted record
+
+Setup: same out-of-state applicant returns a week later to check status. Reads the record via the public portal from EST.
+
+1. Browser fetches the record. Same Stage 2 load chain as T1 if the submission ever got touched by a server-side process that re-saved it.
+2. Displayed wall-clock = stored naive value shifted by the applicant's EST offset (if shift occurred) or shown as-is (if not).
+3. If the applicant ever saved the form again (resubmission, edit), the value re-enters the corruption cycle.
+
+### Summary of cross-TZ effects
+
+| Dimension | Same-TZ (Pacific-only) | Cross-TZ (US domestic) |
+|---|---|---|
+| Config B (119 fields) | No TZ math | Still no TZ math |
+| FORM-BUG-7 | Dormant | Still dormant (US is all UTC-) |
+| Config D #124697 shift magnitude | Fixed at ~7–8h for PST staff | Varies with viewer TZ: ~4h EDT, ~5h CDT, ~6h MDT, ~7h PDT |
+| Config D record displayed time | Consistent across viewers | **Can diverge between viewers in different TZs** |
+| Config C record displayed time | Always viewer-local by design | Different viewers see different wall-clocks (XLAYER-7 amplified) |
+| Dashboard display | Raw stored UTC | Raw stored UTC (unchanged) |
+| Data corruption on first UI open + save of a `postForms` record | Locks in PST-offset shift | **Locks in the traveling viewer's offset shift** — a DC-based first-open corrupts less severely than a PST one, but unpredictably |
+
+### What we don't know (and needs data to quantify)
+
+- **Access pattern of public-facing templates.** Which Config D templates are exposed via the `/Public` portal? How many submissions per month come from non-Washington IP origins? What's the TZ distribution of those submissions?
+- **Staff travel frequency.** Do reviewers routinely open records while traveling? Which roles (field reps, auditors, compliance) travel most?
+- **Workflow re-read paths.** Do any WADNR scheduled scripts or workflows fetch freshly-submitted records via `getForms` and re-save them? Any such path re-enters the #124697 chain with *that execution's* TZ context.
+- **Audit trail divergence.** If two reviewers in different TZs both touch the same Config D record, can we reconstruct what actually happened from logs alone? Likely no without server-side TZ metadata.
+
+### Implication for remediation
+
+The cross-TZ scenarios do not reshuffle the Top-5, but they **amplify the #124697 impact in ways the report previously understated**:
+
+- The "only 12 fields affected" framing is still true, but the *population* of viewers affected by the shift on those fields is wider than the WADNR staff headcount.
+- Platform escalation becomes more urgent, not less: no WADNR-side workaround can prevent out-of-state applicants from experiencing Stage 2 shifts when they re-open their own submissions.
+- The 1 reconfig-safe field (Forest Practices Application Notification / Date of Receipt) was already worth reconfiguring; cross-TZ exposure adds weight — every non-Washington applicant touching that template benefits.
+
+This section stays qualitative until Phase 3 data is in hand. See Part 8.6.
+
+## 6.1 Risk register — ordered by WADNR Real Impact (revised 2026-04-17)
+
+**Real Impact** = severity × live exposure × PST-context. Differs from generic platform severity: bugs dormant for PST users (e.g. FORM-BUG-7) drop down; bugs active in WADNR production (e.g. #124697) stay at top. Rows updated with Phase 2 discovery evidence (A1/A2/A3).
+
+| # | Risk | Layer(s) | Real Impact | Likelihood | Severity | WADNR surface | Short-term mitigation | Long-term fix |
+|---|------|----------|:---:|:---:|:---:|---|---|---|
+| 1 | **#124697 — `postForms` time mutation on first open+save** for Config D | REST API serialize + Form JS load + save | **HIGH** | Certain (affected integrations) | HIGH | All 12 Config D fields; imports, script integrations. **A3 update**: 9 of 12 fields carry meaningful time — reconfiguration is not a viable escape hatch. | Use `forminstance/` for writes. Avoid opening+saving API-created records without edits. | VV: align `getForms` serialization with `forminstance/`; fix `initCalendarValueV1`. |
+| 2 | **Config D reconfiguration options for 10 fields are now quantified** — only 1 field safe to reconfigure to B; 2 need SME investigation; 7 must stay Config D until platform fix | Form template definition + production data | **HIGH** | Certain | MEDIUM | See Appendix B.2/B.3 (revised with A3 evidence) | Reconfigure the 1 safe field now; leave others as-is. | Platform fix removes the reason to reconfigure at all. |
+| 3 | **Mixed-TZ storage accretion** — same `fpOnline` column holds UTC-normalized and naive-local values | Server storage + DB | **MEDIUM** | Certain | MEDIUM | Config C + Config D columns | Document integrations that write these fields and via which endpoint. Audit dashboards for TZ assumptions. | VV: store TZ metadata (datetimeoffset column or anchor TZ column). |
+| 4 | **XLAYER-7 — Config C Form ↔ Dashboard display mismatch** | Dashboard render | **MEDIUM** | Certain | MEDIUM | 3 Config C fields (system timestamps) | Document clearly in dashboards what TZ is shown. Prefer showing with `Z` label. | VV: apply viewer-TZ conversion in Dashboard for Config C fields. |
+| 5 | **FORM-BUG-6 — empty Config C/D returns "Invalid Date"** instead of `""` from GFV | Dev API | **MEDIUM** | Certain when triggered | LOW unless scripts check for empty | 15 Config C+D fields. **A1 update**: 3 WADNR templates already defend with `=== 'Invalid Date'` checks. | Update new scripts to check `=== 'Invalid Date'` / `!Date.parse(val)` instead of `=== ""`. | VV: return `""` for empty DateTime fields. |
+| 6 | **FORM-BUG-5 drift on script GFV→SFV round-trip** for Config D | Dev API | **LOW (latent)** | Low (no current pattern) | HIGH if triggered | 12 Config D fields. **A1 update**: no live exposure. `FillinAndRelateForm` chain cleared; no `new Date(GFV(...))` or `SFV(GFV(...))` patterns in any WADNR template. | Ban `GFV → SFV` on Config D in code review (forward-looking). | VV: fix `GetFieldValue` to not append fake `[Z]`. |
+| 7 | **FORM-BUG-7 latent for UTC+ users** — 122 date-only fields store previous day if touched by a UTC+ user | Form JS input parse | **LOW (dormant)** | Near-zero at WADNR (all-Pacific staff) | HIGH if triggered | 122 Config A/B fields. Activates only for UTC+ user or migration that carried UTC+ semantics. | Monitor user locations. Warn UTC+ contractors. Migration scripts: validate day alignment post-import. | VV: fix `normalizeCalValue` to not route through UTC midnight. |
+| 8 | **Doc Library DOC-BUG-1/2** | Doc Library index | **NONE** | Zero (A2 verified) | HIGH (for other customers) | **A2 update**: 0 date-type index fields on WADNR library. Zero exposure. | No WADNR action required. | VV: fix DOC-BUG-1 offset handling; DOC-BUG-2 empty writes — matters for other customers. |
+| 9 | **WS-BUG-2/3 — DD/MM and ambiguous date parsing** | API write serialization | **NONE** | Zero (no LATAM formats in use) | HIGH (for other customers) | No WADNR integration uses DD/MM. | No WADNR action required. | VV: fix date parser to reject ambiguous or require locale hint. |
+| 10 | **`FillinAndRelateForm` un-audited** (CLOSED by A1) | Dev API + site JS | **RESOLVED** | — | — | 36 templates. **A1 verdict**: no calendar Config D value is passed through the URL chain today. Latent risk only. | Keep code-review ban on GFV→SFV (Risk #6). | N/A — audit complete. |
+
+## 6.2 Recommendations (revised 2026-04-17)
 
 ### Immediate (this sprint)
 
-- **Keep the `forminstance/` workaround** for any `postForms` integration writing to Config D fields. Document the constraint.
-- **Code audit `VV.Form.Global.FillinAndRelateForm`** on vv5dev. Determine whether GFV output with fake `[Z]` is sanitized or passed through unmodified. If unsanitized, identify the 36 templates and map which chains carry Config D values.
-- **Script audit for FORM-BUG-6 checks.** Any script doing `if (GetFieldValue(x) === "")` on a C/D field will mis-classify empty as non-empty. Grep the extracted scripts for this pattern.
+- **Keep the `forminstance/` workaround** for any `postForms` integration writing to Config D fields. Document the constraint in integration specs and in any SDK wrappers.
+- **Reconfigure 1 field to Config B**: `Forest Practices Application Notification / Date of Receipt` (A3: 35 populated records, 100% midnight — safe). Removes 1 field from the #124697 active-exposure set.
+- **Investigate 2 fields with WADNR SMEs** (A3):
+  - `Multi-purpose / Date of Violation` — 29% of populated records have non-midnight time; confirm with SMEs whether this is intentional. If intent is date-only, also reconfigure.
+  - `Informal Conference Note - SUPPORT COPY / Meeting Date` — template has 0 records; confirm it is deprecated/unused. If yes, retire; if no, match configuration to primary template.
 - **Add Part 4.D scenarios 1 and 8 to regression** — any future platform upgrade must pass these scenarios unchanged.
+
+### Standing controls (forward-looking)
+
+- **Ban `GetFieldValue → SetFieldValue` round-trips on Config D fields** in code review (A1 confirms none exist today; this prevents regression).
+- **Prefer `VV.Form.VV.FormPartition.getValueObjectValue`** over `GetFieldValue` for scripts that need the raw stored value — it returns the un-drifted value without the fake `[Z]` wrapper.
+- **Defensive `=== 'Invalid Date'` checks** for any script testing emptiness on a Config C/D field (A1 notes 3 WADNR templates already use this pattern). Treat the pattern as the local standard until FORM-BUG-6 is fixed upstream.
 
 ### Medium-term (next quarter)
 
-- **Reconfigure the 8 misconfigured Config D fields** to Config B after per-field verification that no time data is meaningful. Existing records: time component remains in DB but hidden by UI; no active corruption introduced by the reconfiguration itself. **Caveat**: if any UTC+ user ever touches these fields after the swap, FORM-BUG-7 activates. For WADNR staff this is fine today.
-- **Ship a date-safe script helper library** (e.g. `VV.DateSafe.get(fieldId)`) that internally calls `VV.Form.VV.FormPartition.getValueObjectValue` (the fake-Z-free internal API) and wraps it in a `Date` object the expected way. Publish as a global function and promote to standard.
+- **Ship a date-safe script helper library** (e.g. `VV.DateSafe.get(fieldId)`) that internally calls `VV.Form.VV.FormPartition.getValueObjectValue` and wraps it in a `Date` object the expected way. Publish as a global function and promote to standard.
 - **Dashboard audit** — for each dashboard reading a Config C field, decide whether display should show raw stored value (server UTC) or viewer-local. Add labels accordingly.
 
-### Long-term (platform escalation)
+### Long-term (platform escalation — the central remediation path)
 
-- **Escalate to VV Engineering** with `platform-date-bugs-summary.md`, `temporal-models.md`, and `fix-strategy.md`. The fix is architectural:
-  - **Category 1 (Calendar Date)**: separate storage path (no JS `Date` midnight).
-  - **Category 2 (Instant)**: fix `postForms` to apply UTC normalization.
-  - **Category 3 (Pinned DateTime)**: introduce an anchor-TZ column; fix `getForms` to not append false Z.
+**A3 sharpens why escalation is the only permanent fix.** With 9 of 12 Config D fields carrying meaningful user-entered time data, client-side reconfiguration cannot resolve the #124697 chain. Platform fix required.
+
+- **Escalate to VV Engineering** with the bundle:
+  - `platform-date-bugs-summary.md`
+  - `temporal-models.md`
+  - `fix-strategy.md`
+  - This current-state report
+  - `case-study-124697.md`
+- **Fix-strategy categories** (ordered by WADNR benefit):
+  - **Category 3 (Pinned DateTime)**: introduce an anchor-TZ column; fix `getForms` to not append false `Z`. Fixes FORM-BUG-1, FORM-BUG-5, WS-BUG-1 — the #124697 chain. **Highest WADNR benefit.**
+  - **Category 2 (Instant)**: fix `postForms` to apply UTC normalization for `ignoreTimezone=false` fields. Helps XLAYER-7 (3 Config C fields).
+  - **Category 1 (Calendar Date)**: separate storage path (no JS `Date` midnight). Dormant at WADNR today; matters if a UTC+ user is ever introduced.
   - **Category 4 (Floating)**: decide whether to distinguish from Pinned via a new flag. [src: `research/date-handling/analysis/fix-strategy.md`]
 
 ---
@@ -980,44 +1126,61 @@ All 6 WS bugs + FORM-BUG-7 + CB-29 confirmed as platform-level. WS-10 forminstan
 - DB-5 (filter) BLOCKED — filter toolbar not enabled on the new dashboard.
 - DB-3 D-H BLOCKED — requires IST browser data.
 
-## 7.2 Known gaps
+## 7.2 Known gaps (revised 2026-04-17)
 
-| Gap                                                                                | Why it matters                                                 | Phase 2 action                                                                                 |
+Rows struck through were closed by Phase 2 discovery work (A1/A2/A3). Remaining rows are either deferred or not blocking WADNR remediation.
+
+| Gap                                                                                | Why it matters                                                 | Status                                                                                         |
 | ---------------------------------------------------------------------------------- | -------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| **No native PST / EST runs**                                                       | Part 4 tables currently populated from BRT evidence (valid by UTC-sign argument, but users may want direct proof). | Run Cat 1–11 with macOS set to PST, then EST, against `zzzDate Test Harness` on vv5dev. |
-| **`FillinAndRelateForm` un-audited**                                               | Site-level function, 36 templates use it, touches Config D chain. | Code audit + chain mapping.                                                                     |
-| **DOC-BUG-1/2 never exercised against WADNR**                                      | Unknown whether WADNR documents use date index fields.          | Enumerate date-type index fields in fpOnline; if any, build a minimal harness.                  |
-| **Config D on `forminstance/`** only 6 scenarios executed                          | Current evidence suggests workaround is clean, but narrow.      | Extend Cat 10 slots for `forminstance/` across all C/D scenarios.                               |
+| **No native PST / EST runs**                                                       | Part 4 tables currently populated from BRT evidence (valid by UTC-sign argument, but users may want direct proof). | **Deferred** — UTC-sign proxy is sufficient; Phase 2 runs (Part 8.1/8.2) remain a transparency upgrade, not a correctness gate. |
+| ~~**`FillinAndRelateForm` un-audited**~~                                           | ~~Site-level function, 36 templates use it, touches Config D chain.~~ | **Closed 2026-04-17** (A1). No live FORM-BUG-5 exposure. See [`fillin-and-relate-form-audit.md`](fillin-and-relate-form-audit.md). |
+| ~~**DOC-BUG-1/2 never exercised against WADNR**~~                                  | ~~Unknown whether WADNR documents use date index fields.~~       | **Closed 2026-04-17** (A2). No date-type index fields in use. See [`document-library-date-exposure.md`](document-library-date-exposure.md). |
+| ~~**Config D field-use unknown**~~                                                 | ~~Whether the 8 "misconfigured" fields store meaningful time data determines reconfig safety.~~ | **Closed 2026-04-17** (A3). 7 of 8 fields carry user-entered time; only 1 is reconfig-safe. See [`config-d-field-usage.md`](config-d-field-usage.md). |
+| **Config D on `forminstance/`** only 6 scenarios executed                          | Current evidence suggests workaround is clean, but narrow.      | Low priority. Extend Cat 10 slots for `forminstance/` across all C/D scenarios if a new regression appears. |
 | **Reports, Workflows, Node.js client** — never investigated                         | Each has its own date-handling code path.                      | Scope TBD; low priority unless WADNR uses these features heavily.                               |
-| **Cat 14 Phase B/C — masked fields**                                               | Masks may interact with `normalizeCalValue`.                    | Requires Form Designer access (not available on vv5dev with current write policy).              |
+| **Cat 14 Phase B/C — masked fields**                                               | Masks may interact with `normalizeCalValue`.                    | Requires Form Designer access on EmanuelJofre. Platform-completeness — no WADNR impact. |
 
 ---
 
-# Part 8 — Phase 2 Work (follow-up, not part of this deliverable)
+# Part 8 — Phase 2 Work
 
-Phase 2 upgrades Part 4 cells from evidence-equivalent cells (BRT→PST/EST by UTC-sign argument) to direct WADNR-environment PST/EST runs. Estimated effort: 1–2 hours total.
+Phase 2 was planned as 4 items. **Items 8.3 and 8.4 are complete as of 2026-04-17.** Items 8.1 and 8.2 are deferred pending a specific request for native-TZ direct evidence (UTC-sign proxy remains defensible). A new item 8.5 captured the Config D field-use validation.
 
-## 8.1 Native PST runs
+## 8.1 Native PST runs — **DEFERRED**
+
+Rationale: Part 4 cells are already validated by the UTC-sign argument (BRT → PST via sign flip). Direct PST evidence is a transparency upgrade, not a correctness gate.
 
 1. Set macOS system timezone to `America/Los_Angeles`, restart Chrome.
 2. Verify `new Date().toString()` shows PST/PDT.
 3. Run Playwright harness: `npx playwright test --project=pst-chromium -g "wadnr-cat[1-11]"`.
 4. Update Part 4 tables with direct observations.
 
-## 8.2 Native EST runs
+## 8.2 Native EST runs — **DEFERRED**
 
 Same as 8.1 but `America/New_York`.
 
-## 8.3 FillinAndRelateForm audit
+## 8.3 FillinAndRelateForm audit — **COMPLETE (2026-04-17)**
 
-1. Locate site-level function definition (`VV.Form.Global.FillinAndRelateForm`) in vv5dev admin → Site Options → Global Functions, or via the extracted `global-functions/` folder.
-2. Code-review: does it call `VV.Form.VV.FormPartition.getValueObjectValue` (safe) or `VV.Form.GetFieldValue` (fake `[Z]` risk)?
-3. Enumerate 36 WADNR templates using it; for each, map whether the chain carries Config D field values.
+See [`fillin-and-relate-form-audit.md`](fillin-and-relate-form-audit.md). Verdict: no live FORM-BUG-5 exposure. Latent risk only. Risk #10 in Part 6.1 resolved.
 
-## 8.4 Document Library date-index audit
+## 8.4 Document Library date-index audit — **COMPLETE (2026-04-17)**
 
-1. Query: which index fields in WADNR are of date type? Count documents with non-null values.
-2. If count > 0, reproduce DOC-BUG-1 (offset conversion) and DOC-BUG-2 (cannot clear) on a zzz-prefixed test document.
+See [`document-library-date-exposure.md`](document-library-date-exposure.md). Verdict: 0 date-type index fields in use on WADNR library. Risk #8 in Part 6.1 resolved.
+
+## 8.5 Config D field-use validation — **COMPLETE (2026-04-17)**
+
+See [`config-d-field-usage.md`](config-d-field-usage.md). Verdict: 7 of 8 Appendix B.2 fields carry user-entered time data (reconfig-risky). 1 field safe to reconfigure to Config B. 2 fields (B.3 ambiguous) need SME investigation. This restructures the remediation path (Part 6.2).
+
+## 8.6 Cross-TZ access pattern audit — **OPEN (added 2026-04-17)**
+
+Part 5.2 documents what *would* happen under US-domestic cross-TZ access for both WADNR staff traveling outside Pacific and external applicants submitting from other states. Impact is currently qualitative. To quantify:
+
+1. **Enumerate public-facing templates.** Confirm which WADNR templates are exposed through the `/Public` portal. Cross-reference with the 12 Config D fields in Appendix B — which Config D fields sit on public-submittable forms?
+2. **Sample submission-origin TZ distribution.** Audit access logs / submission metadata for the public-facing Config D templates. What fraction of submissions and subsequent reads originate from non-Pacific US offsets? (Requires log access outside the extract pipeline.)
+3. **Identify workflow re-read paths.** Audit scheduled scripts and web services for any `getForms`-then-save patterns that would re-enter the #124697 chain on newly submitted records. Candidate follow-up: grep the extracted `schedules/` and `web-services/` for `getForms` callers that also write.
+4. **Interview WADNR on staff travel.** Which roles routinely open records while traveling? Is there any known policy (e.g., "do not open production records from outside WA")?
+
+Exit criteria: Part 5.2 impact sizing moves from qualitative to a concrete estimate of cross-TZ access volume, and Risk #1 in Part 6.1 gains a quantified cross-TZ surface component.
 
 ---
 
@@ -1054,32 +1217,34 @@ Summary excerpt of `analysis/field-inventory.md`. Full document is the authorita
 |  D     |    12 |  8.8% | Pinned/Float   |               1 |            3 |          8 |
 | Total  |   137 | 100%  |                |             118 |           10 |          9 (incl. B-as-C) |
 
-## B.2 Config D mismatches (8 fields — the #124697 surface)
+## B.2 Config D name-based mismatches — revised with A3 production evidence (2026-04-17)
 
-| Form Template                                     | Field Name            | Likely correct model | Recommended action         |
-| ------------------------------------------------- | --------------------- | --------------------- | -------------------------- |
-| Forest-Practices-Aerial-Chemical-Application       | Received Date         | 1 — Calendar Date     | Reconfigure to Config B    |
-| Forest-Practices-Application-Notification          | Date of Receipt       | 1 — Calendar Date     | Reconfigure to Config B    |
-| FPAN-Amendment-Request                             | Date of Receipt       | 1 — Calendar Date     | Reconfigure to Config B    |
-| FPAN-Renewal                                       | Date of Receipt       | 1 — Calendar Date     | Reconfigure to Config B    |
-| Long-Term-Application-5-Day-Notice                 | Date of Receipt       | 1 — Calendar Date     | Reconfigure to Config B    |
-| Multi-purpose                                      | Date of Violation     | 1 — Calendar Date     | Reconfigure to Config B    |
-| Step-1-Long-Term-FPA                               | Date of Receipt       | 1 — Calendar Date     | Reconfigure to Config B    |
-| Task                                               | Date Created          | 1 — Calendar Date     | Reconfigure to Config B    |
+Pre-2026-04-17 classification assumed these fields were misconfigured because the names suggest date-only semantics. A3 sampling of up to 1001 records per template shows that **7 of 8 fields carry meaningful user-entered time**, refuting the date-only name-heuristic. The disposition column reflects A3 findings.
 
-## B.3 Config D ambiguous (3 fields — needs per-field decision)
+| Form Template | Field Name | Sample | Populated | % Non-midnight of populated | Disposition (A3 2026-04-17) |
+|---|---|---:|---:|---:|---|
+| Forest-Practices-Aerial-Chemical-Application | Received Date | 1001 | 292 | 80% | **reconfig-risky** |
+| Forest-Practices-Application-Notification | Date of Receipt | 1001 | 35 | **0%** | **reconfig-safe** ← only safe field |
+| FPAN-Amendment-Request | Date of Receipt | 653 | 124 | 89% | **reconfig-risky** |
+| FPAN-Renewal | Date of Receipt | 749 | 171 | 71% | **reconfig-risky** |
+| Long-Term-Application-5-Day-Notice | Date of Receipt | 727 | 104 | 77% | **reconfig-risky** |
+| Multi-purpose | Date of Violation | 229 | 28 | 29% | **investigate** (mixed use) |
+| Step-1-Long-Term-FPA | Date of Receipt | 1001 | 269 | 67% | **reconfig-risky** |
+| Task | Date Created | 278 | 262 | 100% | **reconfig-risky** (effectively a timestamp) |
 
-| Form Template                                     | Field Name            | Reason                                         |
-| ------------------------------------------------- | --------------------- | ---------------------------------------------- |
-| Task                                               | Date Completed        | Name ambiguous; verify time usage              |
-| Informal-Conference-Note                           | Meeting Date          | Verify time-of-meeting is captured             |
-| Informal-Conference-Note-SUPPORT-COPY              | Meeting Date          | Same as above                                  |
+## B.3 Config D ambiguous — revised with A3 production evidence
 
-## B.4 Config D correctly used (1 field)
+| Form Template | Field Name | Sample | Populated | % Non-midnight of populated | Disposition (A3 2026-04-17) |
+|---|---|---:|---:|---:|---|
+| Task | Date Completed | 278 | 59 | 100% | **reconfig-risky** (effectively a timestamp) |
+| Informal-Conference-Note | Meeting Date | 814 | 37 | 70% | **reconfig-risky** (time-of-meeting IS captured) |
+| Informal-Conference-Note-SUPPORT-COPY | Meeting Date | 0 | 0 | — | **no-data** (template appears unused — SME review) |
 
-| Form Template                                     | Field Name            | Model                  |
-| ------------------------------------------------- | --------------------- | ---------------------- |
-| Notice-to-Comply                                   | ViolationDateAndTime  | 3 — Pinned DateTime    |
+## B.4 Config D correctly used — A3 confirmation (2026-04-17)
+
+| Form Template | Field Name | Sample | Populated | % Non-midnight of populated | Model |
+|---|---|---:|---:|---:|---|
+| Notice-to-Comply | ViolationDateAndTime | 572 | 17 | 71% | 3 — Pinned DateTime (confirmed) |
 
 ## B.5 Config B fields that may be Instant (5 fields)
 
@@ -1136,12 +1301,12 @@ Switch write path from `postForms` to `forminstance/` with US date format (`"03/
 | SQL queries / Dashboard filters                |     Yes      | Mixed-storage rows return inconsistent results.          |
 | Config mismatches (8 fields)                   |     Yes      | Workaround does not address misconfiguration.            |
 
-## C.5 Open questions (from case study)
+## C.5 Open questions (from case study) — status as of 2026-04-17
 
-1. Which of the 8 mismatched "Date of Receipt" fields actually carry meaningful time data? — **Critical for reconfiguration decision.**
-2. Are all WADNR users Pacific? — Determines FORM-BUG-7 risk on a Config D→B swap.
-3. Does any WADNR integration read form data via standard `getForms`? — Determines WS-BUG-1 downstream impact.
-4. Does the migration script write all 12 Config D fields or a subset?
+1. ~~Which of the 8 mismatched "Date of Receipt" fields actually carry meaningful time data?~~ — **Answered (A3)**: 7 of 8 carry meaningful time. Only `Forest Practices Application Notification / Date of Receipt` is reconfig-safe. See [`config-d-field-usage.md`](config-d-field-usage.md).
+2. Are all WADNR users Pacific? — Assumed yes (basis for PST-weighted ranking throughout). If the assumption changes, Risk #7 (FORM-BUG-7) re-activates and moves into the top tier.
+3. Does any WADNR integration read form data via standard `getForms`? — **Still open.** Determines WS-BUG-1 downstream impact. Candidate follow-up: audit all scheduled scripts + web services for `getForms` callers.
+4. Does the migration script write all 12 Config D fields or a subset? — **Still open.** Candidate follow-up: request migration-script source from John Sevilla / VV Eng.
 
 Full detail: [`analysis/bug-analysis/case-study-124697.md`](bug-analysis/case-study-124697.md).
 
@@ -1173,6 +1338,9 @@ Every factual claim in this report is traceable to a source in the research repo
 | WADNR field inventory                          | `projects/wadnr/analysis/field-inventory.md`                                                                |
 | WADNR script inventory                         | `projects/wadnr/analysis/script-inventory.md`                                                               |
 | Case study #124697                             | `projects/wadnr/analysis/bug-analysis/case-study-124697.md`                                                 |
+| **A1** FillinAndRelateForm audit (2026-04-17)  | `projects/wadnr/analysis/fillin-and-relate-form-audit.md`                                                   |
+| **A2** Doc Library date-field audit (2026-04-17) | `projects/wadnr/analysis/document-library-date-exposure.md`                                               |
+| **A3** Config D field-use validation (2026-04-17) | `projects/wadnr/analysis/config-d-field-usage.md`                                                       |
 | Test rollup (WADNR)                            | `projects/wadnr/testing/date-handling/status.md`                                                            |
 | WADNR environment profile                      | `projects/wadnr/environment.json`                                                                           |
 | WADNR test asset catalog                       | `projects/wadnr/test-assets.md`                                                                             |

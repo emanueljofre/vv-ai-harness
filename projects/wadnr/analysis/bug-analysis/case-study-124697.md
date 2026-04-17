@@ -1,6 +1,6 @@
 # Case Study: Freshdesk #124697 — postForms Time Mutation in WADNR
 
-> **Status**: DRAFT — updated with John's clarification (2026-04-08). Scope confirmed as all Config D fields, triggered by legacy data migration.
+> **Status**: FINAL (internal) — updated 2026-04-17 with A1/A2/A3 discovery findings. Scope confirmed as all Config D fields; reconfiguration-to-B premise refuted by production data sampling.
 
 | Field            | Value                                                                 |
 | ---------------- | --------------------------------------------------------------------- |
@@ -10,8 +10,10 @@
 | **Customer**     | WA Department of Natural Resources (WADNR)                            |
 | **Database**     | fpOnline                                                              |
 | **Environment**  | vv5dev                                                                |
-| **Status**       | Customer Responded — workaround accepted, core bug still open         |
+| **Status**       | Customer Responded — workaround in effect, core bug still open at platform level |
 | **Product Team** | Michael Betz, Tyler Wolf (assigned), Karim Kargozar (support updates) |
+| **Document status** | FINAL (internal distribution only — not scrubbed for customer sharing) |
+| **Last update**  | 2026-04-17 — A1/A2/A3 findings injected, Open Questions refreshed     |
 
 ---
 
@@ -238,26 +240,39 @@ After migration, the data lives in a system where imported and future records ha
 4. **Any API integration** reading dates from the standard endpoint will receive false UTC markers ([WEBSERVICE-BUG-1](../../web-services/analysis/ws-bug-1-cross-layer-shift.md)).
 5. **Dashboard queries and date-range reports** across records from different creation eras will return inconsistent results — queries cannot distinguish correct imported values from shifted native values in the same `datetime` column.
 
-### Configuration Risk (The 8 Mismatched Fields)
+### Configuration Risk (The 8 Name-Mismatched Fields) — revised 2026-04-17
 
-Eight of the 12 Config D fields should probably be Config B (date-only + `ignoreTimezone`). If these fields are reconfigured:
+The 2026-04-08 framing assumed all 8 fields should be reconfigured to Config B. **A3 production data sampling (2026-04-17) refutes this for 7 of 8 fields.** Users actively enter meaningful time values on most "Date of Receipt" / "Received Date" / "Date Created" fields.
+
+| Field | A3 finding | Reconfig path |
+|---|---|---|
+| Forest Practices Application Notification / Date of Receipt | 0% of populated records have non-midnight time | **Safe to reconfigure to Config B** |
+| Forest Practices Aerial Chemical Application / Received Date | 80% non-midnight | Stay Config D |
+| FPAN Amendment Request / Date of Receipt | 89% non-midnight | Stay Config D |
+| FPAN Renewal / Date of Receipt | 71% non-midnight | Stay Config D |
+| Long-Term 5-Day Notice / Date of Receipt | 77% non-midnight | Stay Config D |
+| Multi-purpose / Date of Violation | 29% non-midnight (mixed use) | Investigate with SMEs |
+| Step 1 Long Term FPA / Date of Receipt | 67% non-midnight | Stay Config D |
+| Task / Date Created | 100% non-midnight (effectively a timestamp) | Stay Config D |
+
+**Implication**: the "reconfigure 8 fields to Config B" path is **mostly not viable**. Reconfiguring fields that users actively populate with time values would hide that data from the UI. For 9 of the 12 Config D fields, the only permanent remediation is a platform fix (FORM-BUG-1 + FORM-BUG-5 + WS-BUG-1). See [`../config-d-field-usage.md`](../config-d-field-usage.md).
+
+The original reconfiguration tradeoffs remain valid for the 1 safe field:
 
 - **Benefit**: Removes exposure to FORM-BUG-1, FORM-BUG-5, and the postForms time shift (date-only fields are immune to the Z-stripping shift)
 - **New exposure**: Config B date-only fields are vulnerable to [FORM-BUG-7](../../forms-calendar/analysis/bug-7-wrong-day-utc-plus.md) (wrong day stored for UTC+ users). WADNR users in Pacific time (UTC-8/UTC-7) would not be affected, but any users in UTC+ timezones would see dates shift by one day
-- **Data migration impact**: Existing records with time components stored in Config D fields would display differently after reconfiguration — the time component would be hidden but still present in the DB
-
-<!-- John confirmed (2026-04-08) the report covers ALL Config D fields. He did not evaluate whether individual fields carry meaningful time data. This question remains critical for reconfiguration decisions. -->
+- **Data migration impact**: For fields where time is stored, UI would hide that data; the 1 reconfig-safe field has all midnights so there is no data-hiding risk
 
 ---
 
-## 7. Open Questions
+## 7. Open Questions — status as of 2026-04-17
 
 1. ~~**Which production field(s) triggered the original report?**~~ — **ANSWERED** (2026-04-08): Not a specific field. John's report covers all Config D fields, triggered by legacy data migration across the entire field class.
-2. ~~**Do any WADNR form scripts perform GFV→SFV round-trips on Config D fields?**~~ — **ANSWERED** (2026-04-08): No template-level round-trips found. 11 scripts interact with Config D fields but none perform GFV→SFV on the same field. `VV.Form.Global.FillinAndRelateForm` (site-level) is uninspected.
-3. **Do the 8 mismatched "Date of Receipt" fields carry meaningful time data?** — **CRITICAL**: Determines whether reconfiguration to Config B is safe. John did not evaluate this — he assumed Config D was correct for all fields.
-4. **Are WADNR users exclusively in Pacific timezone?** — If yes, FORM-BUG-7 risk is zero for a Config B migration; if any users operate from UTC+ (e.g., remote workers, international stakeholders), FORM-BUG-7 applies
-5. **Does any WADNR integration read form data via the standard REST API?** — Determines WEBSERVICE-BUG-1 exposure beyond the Forms UI
-6. **Does John's migration script import data into all 12 Config D fields, or only a subset?** — Determines which fields have correct imported data vs. which were never touched by the migration
+2. ~~**Do any WADNR form scripts perform GFV→SFV round-trips on Config D fields?**~~ — **ANSWERED** (2026-04-08, reconfirmed 2026-04-17 by A1): No template-level round-trips; `FillinAndRelateForm` chain cleared. See [`../fillin-and-relate-form-audit.md`](../fillin-and-relate-form-audit.md).
+3. ~~**Do the 8 mismatched "Date of Receipt" fields carry meaningful time data?**~~ — **ANSWERED** (A3, 2026-04-17): Yes, 7 of 8 do. Only `Forest Practices Application Notification / Date of Receipt` is reconfig-safe. See [`../config-d-field-usage.md`](../config-d-field-usage.md).
+4. **Are WADNR users exclusively in Pacific timezone?** — **Assumed yes** (basis for PST-weighted risk ranking in current-state.md). If any users operate from UTC+ (remote workers, international stakeholders), FORM-BUG-7 activates and the risk ranking shifts.
+5. **Does any WADNR integration read form data via the standard REST API?** — **Still open.** Determines WEBSERVICE-BUG-1 downstream impact. Candidate follow-up: audit scheduled scripts and web services for `getForms` callers.
+6. **Does John's migration script import data into all 12 Config D fields, or only a subset?** — **Still open.** Candidate follow-up: request migration-script source from John Sevilla / VV Eng.
 
 ---
 
@@ -272,3 +287,7 @@ Eight of the 12 Config D fields should probably be Config B (date-only + `ignore
 | [WADNR Field Inventory](../field-inventory.md)                                       | 137 calendar fields across 35 templates, 12 Config D                    |
 | [Root Cause Analysis](../../analysis/temporal-models.md)                             | 14 bugs, 4 temporal models, architectural limitations                   |
 | [Fix Strategy](../../analysis/fix-strategy.md)                                       | Categories of change needed per temporal model                          |
+| [Current-state report](../date-handling-current-state.md)                            | WADNR-scoped, PST-weighted risk register — the integrating document     |
+| [FillinAndRelateForm audit (A1, 2026-04-17)](../fillin-and-relate-form-audit.md)     | Confirmed no live FORM-BUG-5 chain exposure                             |
+| [Doc Library date-field audit (A2, 2026-04-17)](../document-library-date-exposure.md) | Confirmed zero DOC-BUG-1/2 exposure at WADNR                            |
+| [Config D field-use validation (A3, 2026-04-17)](../config-d-field-usage.md)         | Per-field reconfig-safety call based on production data                 |
