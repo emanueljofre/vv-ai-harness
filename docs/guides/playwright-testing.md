@@ -82,7 +82,7 @@ run-regression.js (orchestrator)
 
 Three files in `testing/`:
 
-- `reporters/regression-reporter.js` — custom Playwright reporter that captures results + actual values to JSON
+- `reporters/regression-reporter.js` — custom Playwright reporter that captures results + actual values to JSON. Also embeds `buildContext.fingerprint` (SHA-8 identity for the platform build) so the timeline tool (`npm run build:timeline`) can correlate runs with rollouts.
 - `scripts/run-regression.js` — CLI entry point (runs tests then triggers artifact generation)
 - `tools/generators/generate-artifacts.js` — reads JSON, creates/updates markdown artifacts
 
