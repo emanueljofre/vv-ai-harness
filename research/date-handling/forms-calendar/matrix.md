@@ -5,11 +5,13 @@ Bug analysis → `analysis/`
 
 **Execution results**: See `projects/{customer}/testing/date-handling/forms-calendar/status.md` per environment.
 
-Total slots: 242
+Total slots: 351 (269 baselined + 82 backlog — see [Open Gaps & Backlog](#open-gaps--backlog))
 
-> **Note**: Results columns in the tables below are a historical snapshot from the EmanuelJofre (vvdemo) baseline. Live status tracking is in per-project `status.md` files.
+> **Note**: Results columns in the tables below are a historical snapshot from the EmanuelJofre (vvdemo) baseline captured under the **default Platform Scope** (V1 code path, T1/T2 off, en-US Culture — see [Platform Scope](#platform-scope)). Live status tracking is in per-project `status.md` files.
 
-**Cross-environment validation**: WADNR (vv5dev) — 116/116 PASS on BRT-Chromium (2026-04-10). All results identical to EmanuelJofre baseline. See `projects/wadnr/testing/date-handling/forms-calendar/status.md`. For the WADNR-scoped synthesis (per-layer + per-config walkthroughs): `projects/wadnr/analysis/date-handling-current-state.md`.
+**Cross-environment validation**: WADNR (vv5dev) — 116/116 PASS on BRT-Chromium (2026-04-10). All results identical to EmanuelJofre baseline, **same V1 default scope**. See `projects/wadnr/testing/date-handling/forms-calendar/status.md`. For the WADNR-scoped synthesis (per-layer + per-config walkthroughs): `projects/wadnr/analysis/date-handling-current-state.md`.
+
+**V2 baseline status (vv5dev/EmanuelJofre)**: Initial chromium run captured 2026-04-20 (405 executed / 51 passed / 354 failed) at [`projects/emanueljofre-vv5dev/testing/date-handling/`](../../../projects/emanueljofre-vv5dev/testing/date-handling/). Expected values in Cats 1–13 are still V1-baselined — most of the 354 "failures" are **expected-value drift**, not new bugs. A rebaseline pass is required before new-bug accounting is accurate; see [Open Gaps & Backlog § G1](#open-gaps--backlog).
 
 ---
 
@@ -18,6 +20,8 @@ Total slots: 242
 Category test IDs (`1-A-BRT`, `7-D-isoNoZ`) identify **planned test slots** — a Config × TZ × input combination that may or may not have been run. They map to rows in this file.
 
 Execution test IDs (`1.1`, `2.3`) identify **session run blocks** in `results.md`. One execution block may cover multiple category IDs.
+
+**Platform-scope suffix** (new 2026-04-20): when a slot is run under a non-default Platform Scope, append a `.<scope>` suffix — e.g. `1-D-BRT.V2`, `1-D-BRT.V2+T1`, `7-D-isoZ.ptBR`. Slots without a suffix implicitly use the default scope (V1, T1/T2 off, en-US). See the [Platform Scope](#platform-scope) section for the scope tokens.
 
 ---
 
@@ -41,31 +45,118 @@ All tests target one of 8 field configurations defined by three boolean flags:
 
 ---
 
+## Platform Scope
+
+Every test slot is implicitly run against a Platform Scope — the set of Central Admin toggles and customer-level settings that modulate the pipeline _before_ field config and browser TZ enter the picture. The full catalogue is documented in [`projects/emanueljofre-vv5dev/analysis/central-admin/SCOPE-HIERARCHY.md`](../../../projects/emanueljofre-vv5dev/analysis/central-admin/SCOPE-HIERARCHY.md); the subset relevant to this matrix:
+
+| Token  | Setting                                                | Default (existing slots) | Notes                                                                   |
+| ------ | ------------------------------------------------------ | ------------------------ | ----------------------------------------------------------------------- |
+| `V1`   | "Use Updated Calendar Control Logic" — OFF (DB scope)  | **V1**                   | Default on vvdemo/EmanuelJofre-vvdemo and WADNR                         |
+| `V2`   | "Use Updated Calendar Control Logic" — ON (DB scope)   | —                        | Default on vv5dev/EmanuelJofre-vv5dev (DB-scope push via `setUserInfo`) |
+| `T1`   | "Convert Date Fields to Customer Timezone" — ON        | OFF                      | Untested platform toggle (Cat 17)                                       |
+| `T2`   | "Prevent Conversion For Dates Ignoring Timezones" — ON | OFF                      | Override for `ignoreTimezone=true` when T1 is on                        |
+| `T3`   | "Calendar Field Default Mask" set (platform-level)     | blank                    | Distinct from per-field `<Mask>` (Cat 14 A-C)                           |
+| `enUS` | Customer Culture = `English (United States)` (MM/DD)   | **enUS**                 | Default — our entire baseline                                           |
+| `ptBR` | Customer Culture = `Portuguese (Brazil)` (DD/MM)       | —                        | Customer-scope Central Admin (Cat 18)                                   |
+| `esES` | Customer Culture = `Spanish (Spain)` (DD/MM)           | —                        | Customer-scope Central Admin (Cat 18)                                   |
+
+**Scope suffix on test IDs**: slots without a suffix assume the full default scope (`.V1.enUS`, no T1/T2/T3). Non-default slots carry an explicit suffix — e.g. `1-D-BRT.V2`, `1-D-BRT.V2+T1`, `7-D-isoZ.ptBR`, `14-A-SFV.T3`. Multiple tokens combine with `+`.
+
+**Scope precedence** (observed via V1/V2 cascade): Database > Customer > Environment. A slot's scope is the **effective resolved value** regardless of which scope set it.
+
+---
+
 ## Coverage Summary
 
 `PASS` = ran, no bug triggered. `FAIL` = ran, bug confirmed. `PENDING` = not yet run, no blocker. `BLOCKED` = requires access/setup not currently available. `PARTIAL` = ran, partial result only (noted in Actual). `SKIP` = intentionally excluded with known reason.
 
-| Category                  |  Total  |  PASS   |  FAIL   | PENDING | BLOCKED | PARTIAL | SKIP  |
-| ------------------------- | :-----: | :-----: | :-----: | :-----: | :-----: | :-----: | :---: |
-| 1. Calendar Popup         |   20    |    4    |   16    |    0    |    0    |    0    |   0   |
-| 2. Typed Input            |   16    |    8    |    8    |    0    |    0    |    0    |   0   |
-| 3. Server Reload          |   18    |   10    |    8    |    0    |    0    |    0    |   0   |
-| 4. URL Parameters         |   39    |   39    |    0    |    0    |    0    |    0    |   0   |
-| 5. Preset Date            |   18    |   11    |    7    |    0    |    0    |    0    |   0   |
-| 6. Current Date           |   15    |   13    |    2    |    0    |    0    |    0    |   0   |
-| 7. SetFieldValue formats  |   39    |   23    |   16    |    0    |    0    |    0    |   0   |
-| 8. GetFieldValue return   |   19    |   13    |    6    |    0    |    0    |    0    |   0   |
-| 8B. GetDateObject return  |   12    |   11    |    1    |    0    |    0    |    0    |   0   |
-| 9. Round-Trip (GFV)       |   20    |    9    |   11    |    0    |    0    |    0    |   0   |
-| 9-GDOC. Round-Trip (GDOC) |    5    |    4    |    1    |    0    |    0    |    0    |   0   |
-| 10. Web Service           |   11    |    4    |    5    |    1    |    0    |    0    |   1   |
-| 11. Cross-Timezone        |   18    |   11    |    6    |    1    |    0    |    0    |   0   |
-| 12. Edge Cases            |   20    |    3    |   16    |    0    |    0    |    0    |   1   |
-| 13. Database              |   10    |    4    |    6    |    0    |    0    |    0    |   0   |
-| 14. Mask Impact           |   13    |    0    |    0    |   13    |    0    |    0    |   0   |
-| 15. Kendo Widget Compare  |    8    |    0    |    0    |    8    |    0    |    0    |   0   |
-| 16. Server TZ Form Save   |    6    |    0    |    0    |    6    |    0    |    0    |   0   |
-| **TOTAL**                 | **269** | **113** | **100** | **53**  |  **0**  |  **1**  | **2** |
+| Category                        |  Total  |  PASS   |  FAIL   | PENDING | BLOCKED | PARTIAL | SKIP  |
+| ------------------------------- | :-----: | :-----: | :-----: | :-----: | :-----: | :-----: | :---: |
+| 1. Calendar Popup               |   20    |    4    |   16    |    0    |    0    |    0    |   0   |
+| 2. Typed Input                  |   16    |    8    |    8    |    0    |    0    |    0    |   0   |
+| 3. Server Reload                |   18    |   10    |    8    |    0    |    0    |    0    |   0   |
+| 4. URL Parameters               |   39    |   39    |    0    |    0    |    0    |    0    |   0   |
+| 5. Preset Date                  |   18    |   11    |    7    |    0    |    0    |    0    |   0   |
+| 6. Current Date                 |   15    |   13    |    2    |    0    |    0    |    0    |   0   |
+| 7. SetFieldValue formats        |   39    |   23    |   16    |    0    |    0    |    0    |   0   |
+| 8. GetFieldValue return         |   19    |   13    |    6    |    0    |    0    |    0    |   0   |
+| 8B. GetDateObject return        |   12    |   11    |    1    |    0    |    0    |    0    |   0   |
+| 9. Round-Trip (GFV)             |   20    |    9    |   11    |    0    |    0    |    0    |   0   |
+| 9-GDOC. Round-Trip (GDOC)       |    5    |    4    |    1    |    0    |    0    |    0    |   0   |
+| 10. Web Service                 |   11    |    4    |    5    |    1    |    0    |    0    |   1   |
+| 11. Cross-Timezone              |   18    |   11    |    6    |    1    |    0    |    0    |   0   |
+| 12. Edge Cases                  |   20    |    3    |   16    |    0    |    0    |    0    |   1   |
+| 13. Database                    |   10    |    4    |    6    |    0    |    0    |    0    |   0   |
+| 14. Mask Impact (A-C)           |   13    |    0    |    0    |   13    |    0    |    0    |   0   |
+| 14-D. Platform-Default Mask     |    6    |    0    |    0    |    6    |    0    |    0    |   0   |
+| 15. Kendo Widget Compare        |    8    |    0    |    0    |    8    |    0    |    0    |   0   |
+| 16. Server TZ Form Save         |    6    |    0    |    0    |    6    |    0    |    0    |   0   |
+| 17. Platform TZ Toggles (T1/T2) |   48    |    0    |    0    |   48    |    0    |    0    |   0   |
+| 18. Customer Culture (locale)   |   20    |    0    |    0    |   20    |    0    |    0    |   0   |
+| 19. Server-Generated Timestamps |    8    |    0    |    0    |    8    |    0    |    0    |   0   |
+| **TOTAL**                       | **351** | **113** | **100** | **135** |  **0**  |  **1**  | **2** |
+
+**Scope coverage note**: the 214 non-PENDING slots above are all at default scope (`.V1.enUS`, T1/T2/T3 off). The 135 PENDING slots either vary scope explicitly (Cats 17/18, V2 rebaseline) or exercise dimensions not yet covered at the default scope (Cats 14/14-D/15/16/19 and residual PENDING in 10/11).
+
+---
+
+## Open Gaps & Backlog
+
+Meta-tracker for coverage gaps identified 2026-04-20 from the Central Admin exploration. Gaps not yet represented as PENDING slots in the Coverage Summary appear below as `Gn` IDs. Each entry: _Why it matters → How to close it → Priority_.
+
+### Tier 1 — High-impact untested platform toggles
+
+| ID  | Gap                                                           | Why it matters                                                                                                                   | Close by                                                                                                                                                          | Priority |
+| --- | ------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- |
+| G1  | V2 rebaseline of Cats 1–13 expected values                    | 354 "failures" in the V2 chromium run are mostly expected-value drift, not bugs. Until rebaselined, new-bug accounting is noisy. | Rewrite expected columns for every default-scope slot under V2 code-path logic. Code in `bug-5-fake-z-drift.md` § V2 behavior explains the expected-value deltas. | **P0**   |
+| G2  | T1 "Convert Date Fields to Customer Timezone" behavior        | Untested platform toggle; could invert FORM-BUG-5/7 or create new bugs. Customers with this on will see divergent behavior.      | Cat 17 (48 slots defined below). Requires flipping toggle on a sandbox DB scope.                                                                                  | **P0**   |
+| G3  | T2 "Prevent Conversion For Dates Ignoring Timezones" behavior | Override for `ignoreTimezone=true` when T1 is on. Interacts with FORM-BUG-5 (Config D) directly.                                 | Cat 17b (subset of 48 slots when T1+T2 both on).                                                                                                                  | **P0**   |
+| G4  | T3 Platform-default Calendar Mask                             | Distinct from Cat 14's per-field mask. Unknown whether it applies to fields that omit `<Mask>` under sparse JSON templates.      | Cat 14-D (6 slots defined below).                                                                                                                                 | P1       |
+| G5  | Customer Culture (non-en-US)                                  | Flips MM/DD ↔ DD/MM parsing. May invalidate WEBSERVICE-BUG-2/3 (DD/MM silently discarded). Affects display + parsing.            | Cat 18 (20 slots defined below).                                                                                                                                  | P1       |
+| G6  | Server-generated timestamps respecting Customer TZ            | `DateTime.Now`, `GETDATE()`, Created Date, Workflow due-date. None tested with Customer TZ variation.                            | Cat 19 (8 slots defined below) + new `workflows/` and `scheduled-processes/` matrices (P2).                                                                       | P1       |
+
+### Tier 2 — Matrix-intrinsic PENDING (no blocker, just work)
+
+| ID  | Gap                                              | Status in matrix                                                           | Priority |
+| --- | ------------------------------------------------ | -------------------------------------------------------------------------- | -------- |
+| G7  | Cat 14 Phase B/C — per-field masked fields       | 13 PENDING slots. Requires Form Designer access on EmanuelJofre (have it). | P1       |
+| G8  | Cat 15 — Kendo widget internals comparison       | 8 PENDING. V1 vs V2 widget-layer diff.                                     | P2       |
+| G9  | Cat 16 — Server TZ Form Save additional variants | 6 PENDING.                                                                 | P2       |
+| G10 | FORM-BUG-7 V1 IST live test                      | Code-confirmed in V1, no live IST row in Cat 1.                            | P2       |
+| G11 | Cat 2 typed input legacy (E-H) in IST/UTC0       | Missing.                                                                   | P3       |
+| G12 | Cat 10 `10-D-script-scheduled` PENDING           | Requires live scheduled script.                                            | P3       |
+
+### Tier 3 — Spot-check platform toggles (not yet promoted to categories)
+
+| ID  | Toggle (Forms section, DB scope)          | Current | Risk if different                                                                 | Priority |
+| --- | ----------------------------------------- | ------- | --------------------------------------------------------------------------------- | -------- |
+| G13 | Use Beta Form Viewer                      | ☑       | Non-beta FormViewer is a different Angular build — FORM-BUG-5 may not exist there | P2       |
+| G14 | Use Beta Form Optimizations               | ☑       | Narrower-scope runtime tweaks                                                     | P3       |
+| G15 | Use Offline Forms 2.0                     | ☑       | Offline→online sync is a new conversion path                                      | P3       |
+| G16 | Use Template Conditions For DataInstances | ☐       | Conditionally hidden calendar fields — still serialized on save? With what value? | P3       |
+| G17 | Enable Replace Form Revision              | ☐       | New revision may re-resolve sparse JSON defaults differently                      | P3       |
+| G18 | Form Designer Responsive Flow             | Default | Dropdown alternates unknown                                                       | P3       |
+
+### Tier 4 — Cross-component gaps (driven from other matrices, linked here for awareness)
+
+| ID  | Gap                                                     | Where tracked                                                             |
+| --- | ------------------------------------------------------- | ------------------------------------------------------------------------- |
+| G19 | WS matrix: T1/T2 cross-layer variants                   | [`web-services/matrix.md § WS-11`](../web-services/matrix.md)             |
+| G20 | WS matrix: Culture variant (DD/MM) for input tolerance  | [`web-services/matrix.md § WS-12`](../web-services/matrix.md)             |
+| G21 | WS matrix: Customer-TZ variant for `DateTime.Now` math  | [`web-services/matrix.md § WS-13`](../web-services/matrix.md)             |
+| G22 | Dashboards: Culture variant of display format (DB-1)    | [`dashboards/matrix.md § DB-9`](../dashboards/matrix.md)                  |
+| G23 | Doc Library: Culture variant of DOC-1/5/7               | [`document-library/matrix.md § DOC-9`](../document-library/matrix.md)     |
+| G24 | Doc Library: lifecycle date defaults                    | [`document-library/matrix.md § DOC-10`](../document-library/matrix.md)    |
+| G25 | Workflow task due-date computation (customer TZ)        | [`workflows/matrix.md`](../workflows/matrix.md) (new)                     |
+| G26 | Scheduled Process firing window + Service Task timing   | [`scheduled-processes/matrix.md`](../scheduled-processes/matrix.md) (new) |
+| G27 | Work Week (`<WorkWeek>` XML) — skip-weekend date math   | Tracked in `workflows/matrix.md`                                          |
+| G28 | Timecard pay-period math (vertical module — not active) | Deferred until module is enabled                                          |
+
+### Tier 5 — Deferred (low priority until customer surface)
+
+- Half-odd-minute TZs (Newfoundland -3:30, Chatham +12:45/+13:45). IST covers :30; no existing :45 coverage.
+- DST in non-US/non-BRT TZs.
+- Year boundary with Culture=ptBR (fiscal year format differences).
 
 ---
 
@@ -477,11 +568,11 @@ Simulate a scheduled script, form button event, or REST API call setting a date 
 
 | Test ID                  | Action                                                          |    TZ 1     | TZ 2  | Expected                                                                                | Actual                                                           | Status  | Run Date   | Evidence                                            |
 | ------------------------ | --------------------------------------------------------------- | :---------: | :---: | --------------------------------------------------------------------------------------- | ---------------------------------------------------------------- | ------- | ---------- | --------------------------------------------------- |
-| 11-save-BRT-load-IST     | Save in BRT, load in IST (all 8 configs)                        |     BRT     |  IST  | All configs raw preserved; Config D GFV adds FORM-BUG-5 fake Z                          | A-H raw preserved; D GFV `.000Z`; all others GFV = raw           | PASS    | 2026-04-09 | [summary](summaries/tc-11-D-save-BRT-load-IST.md)   |
+| 11-save-BRT-load-IST     | Save in BRT, load in IST (all 8 configs)                        |     BRT     |  IST  | All configs raw preserved; Config D GFV adds FORM-BUG-5 fake Z                          | A-H raw preserved; D GFV `.000Z`; all others GFV = raw           | PASS    | 2026-04-09 | [spec](test-cases/tc-11-save-BRT-load-IST.md)       |
 | 11-save-IST-load-BRT     | Save in IST, load in BRT                                        |     IST     |  BRT  | Load preserves raw; A shows pre-existing IST save Bug #7; D raw stable, Bug #5 GFV      | A: `"2026-03-14"` (IST save damage); D: preserved                | PASS    | 2026-04-09 | [summary](summaries/tc-11-save-IST-load-BRT.md)     |
 | 11-roundtrip-cross       | BRT save → IST load → round-trip → BRT reload                   | BRT→IST→BRT |   —   | Compound drift: IST +5:30h then BRT -3h = net +2:30h from midnight                      | IST→`T05:30:00` then BRT→`T02:30:00` (+2:30h net)                | FAIL    | 2026-04-09 | [summary](summaries/tc-11-roundtrip-cross.md)       |
 | 11-concurrent-edit       | User A (BRT) + User B (IST) edit same record                    |     BRT     |  IST  | Overwrite with different UTC moment for "same" date                                     | BRT→`T21:00:00` (day boundary) then IST→`T02:30:00` (+2:30h net) | FAIL    | 2026-04-09 | [summary](summaries/tc-11-concurrent-edit.md)       |
-| 11-report-cross          | Query DB for dates entered from different TZs                   |    mixed    |   —   | Inconsistent SQL results                                                                | Identified theoretically (see results.md § Test 2.4)             | PENDING | —          | results.md                                          |
+| 11-report-cross          | Query DB for dates entered from different TZs                   |    mixed    |   —   | Inconsistent SQL results                                                                | Identified theoretically (see results.md § Test 2.4)             | PENDING | —          | [spec](test-cases/tc-11-report-cross.md)            |
 | 11-load-UTC0             | BRT-saved record loaded in UTC+0                                |     BRT     | UTC+0 | No fake-Z drift (Z happens to be correct)                                               | 0 drift; Bug #5 fake Z present but coincidentally OK             | FAIL    | 2026-04-09 | [summary](summaries/tc-11-load-UTC0.md)             |
 | 11-load-PST              | BRT-saved record loaded in PST (UTC-8)                          |     BRT     |  PDT  | -7h/trip drift (prediction corrected 2026-04-08: PDT not PST — DST active Mar 15)       | raw preserved; round-trip `"2026-03-14T17:00:00"` (-7h)          | FAIL    | 2026-04-09 | [summary](summaries/tc-11-load-PST.md)              |
 | 11-load-Tokyo            | BRT-saved record loaded in JST (UTC+9)                          |     BRT     |  JST  | +9h/trip drift on round-trip                                                            | raw preserved; round-trip `"2026-03-15T09:00:00"` (+9h)          | FAIL    | 2026-04-08 | [summary](summaries/tc-11-load-Tokyo.md)            |
@@ -495,6 +586,21 @@ Simulate a scheduled script, form button event, or REST API call setting a date 
 | 11-G-save-BRT-load-IST   | Config G (legacy DateTime): save in BRT, load in IST            |     BRT     |  IST  | Raw preserved (legacy DateTime GFV returns raw)                                         | `"2026-03-15T00:00:00"` preserved in IST                         | PASS    | 2026-04-09 | [summary](summaries/tc-11-G-save-BRT-load-IST.md)   |
 | 11-H-save-BRT-load-IST   | Config H (legacy DateTime + ignoreTZ): save in BRT, load IST    |     BRT     |  IST  | Raw preserved (legacy bypasses FORM-BUG-5)                                              | `"2026-03-15T00:00:00"` preserved in IST                         | PASS    | 2026-04-09 | [summary](summaries/tc-11-H-save-BRT-load-IST.md)   |
 | 11-H-BRT-roundtrip       | Config H: save in BRT, multiple round-trips, verify no drift    |     BRT     |   —   | 0 drift — useLegacy=true; confirms legacy fixes FORM-BUG-5 for ignoreTZ+enableTime      | `"2026-03-15T00:00:00"` unchanged after 3 trips                  | PASS    | 2026-04-09 | [summary](summaries/tc-11-H-BRT-roundtrip.md)       |
+
+#### V2-scope baseline (EmanuelJofre-vv5dev, DB-scope "Use Updated Calendar Control Logic" = ON)
+
+Baseline captured 2026-04-20 via `cat-11-cross-timezone.spec.js` on IST-chromium. V2 normalizes every config's `raw` to ISO-with-Z (`YYYY-MM-DDTHH:mm:ss.000Z`) and collapses the V1 GFV transformation so `api === raw`. Legacy immunity (E–H) is gone at the raw-format layer. Config A/E carry FORM-BUG-7 (IST midnight → UTC previous day); ignoreTimezone (B/D/F/H) still mitigates day shift. Spec runs SFV in IST, not cross-TZ load — see run file. Source: [run](../../../projects/emanueljofre-vv5dev/testing/date-handling/forms-calendar/runs/cat11-save-BRT-load-IST-vv5dev-2026-04-20.md).
+
+| Test ID                   | Description                                | TZ 1 | TZ 2 | Expected (V2)                        | Actual (V2)                          | Status | Run Date   | Evidence                                                                                                                            |
+| ------------------------- | ------------------------------------------ | :--: | :--: | ------------------------------------ | ------------------------------------ | ------ | ---------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| 11-A-save-BRT-load-IST.V2 | Config A (date-only, TZ-aware), V2         | BRT  | IST  | `"2026-03-14T18:30:00.000Z"` (BUG-7) | `"2026-03-14T18:30:00.000Z"` (BUG-7) | PASS   | 2026-04-20 | [run](../../../projects/emanueljofre-vv5dev/testing/date-handling/forms-calendar/runs/cat11-save-BRT-load-IST-vv5dev-2026-04-20.md) |
+| 11-B-save-BRT-load-IST.V2 | Config B (date-only + ignoreTZ), V2        | BRT  | IST  | `"2026-03-15T00:00:00.000Z"`         | `"2026-03-15T00:00:00.000Z"`         | PASS   | 2026-04-20 | [run](../../../projects/emanueljofre-vv5dev/testing/date-handling/forms-calendar/runs/cat11-save-BRT-load-IST-vv5dev-2026-04-20.md) |
+| 11-C-save-BRT-load-IST.V2 | Config C (DateTime, TZ-aware), V2          | BRT  | IST  | `"2026-03-15T00:00:00.000Z"`         | `"2026-03-15T00:00:00.000Z"`         | PASS   | 2026-04-20 | [run](../../../projects/emanueljofre-vv5dev/testing/date-handling/forms-calendar/runs/cat11-save-BRT-load-IST-vv5dev-2026-04-20.md) |
+| 11-D-save-BRT-load-IST.V2 | Config D (DateTime + ignoreTZ), V2         | BRT  | IST  | `"2026-03-15T00:00:00.000Z"`         | `"2026-03-15T00:00:00.000Z"`         | PASS   | 2026-04-20 | [run](../../../projects/emanueljofre-vv5dev/testing/date-handling/forms-calendar/runs/cat11-save-BRT-load-IST-vv5dev-2026-04-20.md) |
+| 11-E-save-BRT-load-IST.V2 | Config E (legacy date-only, TZ-aware), V2  | BRT  | IST  | `"2026-03-14T18:30:00.000Z"` (BUG-7) | `"2026-03-14T18:30:00.000Z"` (BUG-7) | PASS   | 2026-04-20 | [run](../../../projects/emanueljofre-vv5dev/testing/date-handling/forms-calendar/runs/cat11-save-BRT-load-IST-vv5dev-2026-04-20.md) |
+| 11-F-save-BRT-load-IST.V2 | Config F (legacy date-only + ignoreTZ), V2 | BRT  | IST  | `"2026-03-15T00:00:00.000Z"`         | `"2026-03-15T00:00:00.000Z"`         | PASS   | 2026-04-20 | [run](../../../projects/emanueljofre-vv5dev/testing/date-handling/forms-calendar/runs/cat11-save-BRT-load-IST-vv5dev-2026-04-20.md) |
+| 11-G-save-BRT-load-IST.V2 | Config G (legacy DateTime), V2             | BRT  | IST  | `"2026-03-15T00:00:00.000Z"`         | `"2026-03-15T00:00:00.000Z"`         | PASS   | 2026-04-20 | [run](../../../projects/emanueljofre-vv5dev/testing/date-handling/forms-calendar/runs/cat11-save-BRT-load-IST-vv5dev-2026-04-20.md) |
+| 11-H-save-BRT-load-IST.V2 | Config H (legacy DateTime + ignoreTZ), V2  | BRT  | IST  | `"2026-03-15T00:00:00.000Z"`         | `"2026-03-15T00:00:00.000Z"`         | PASS   | 2026-04-20 | [run](../../../projects/emanueljofre-vv5dev/testing/date-handling/forms-calendar/runs/cat11-save-BRT-load-IST-vv5dev-2026-04-20.md) |
 
 ---
 
@@ -512,7 +618,7 @@ Simulate a scheduled script, form button event, or REST API call setting a date 
 | 12-near-midnight-2-IST    |   D    |  IST  | Local time near midnight, IST | `"2026-03-15T23:00:00"`      | 1 trip: +5:30h → `"2026-03-16T04:30:00"` — day crosses FORWARD                     | 1 trip: `"2026-03-16T04:30:00"` (+5:30h, day forward confirmed)                   | FAIL   | 2026-04-09 | [summary](summaries/tc-12-near-midnight-2-IST.md)    |
 | 12-dst-transition         |   D    |  BRT  | US DST change day             | `"2026-03-08T02:00:00"`      | -3h drift from BRT — no DST anomaly (Brazil has no DST)                            | -3h BRT drift confirmed; no DST anomaly                                           | FAIL   | 2026-04-09 | [summary](summaries/tc-12-dst-transition.md)         |
 | 12-dst-US-PST             |   D    |  PDT  | US DST spring-forward         | `"2026-03-08T02:00:00"`      | 2AM→3AM advance + Bug #5 crosses day + DST boundary: `"2026-03-07T19:00:00"` (-8h) | V8 advances to 3AM; round-trip → Mar 7 19:00 PST (pre-DST)                        | FAIL   | 2026-04-09 | [summary](summaries/tc-12-dst-US-PST.md)             |
-| 12-dst-brazil             |   D    |   —   | Brazil DST                    | —                            | Brazil no longer uses DST                                                          | —                                                                                 | SKIP   | —          | —                                                    |
+| 12-dst-brazil             |   D    |   —   | Brazil DST                    | —                            | Brazil no longer uses DST                                                          | —                                                                                 | SKIP   | —          | [spec](test-cases/tc-12-dst-brazil.md)               |
 | 12-year-boundary          |   D    |  BRT  | Jan 1 midnight                | `"2026-01-01T00:00:00"`      | 1 trip → `"2025-12-31T21:00:00"` — year boundary crossed                           | 1 trip → `"2025-12-31T21:00:00"` (year crossed confirmed)                         | FAIL   | 2026-04-09 | [summary](summaries/tc-12-year-boundary.md)          |
 | 12-year-boundary-IST      |   D    |  IST  | Jan 1 midnight, IST           | `"2026-01-01T00:00:00"`      | 1 trip: +5:30h → `"2026-01-01T05:30:00"` — stays in 2026 (opposite of BRT)         | 1 trip: `"2026-01-01T05:30:00"` (stays 2026 confirmed)                            | FAIL   | 2026-04-09 | [summary](summaries/tc-12-year-boundary-IST.md)      |
 | 12-leap-day               |   D    |  BRT  | Feb 29 on leap year           | `"2028-02-29T00:00:00"`      | 1 trip → `"2028-02-28T21:00:00"` — leap day lost                                   | 1 trip → `"2028-02-28T21:00:00"` (leap day lost confirmed)                        | FAIL   | 2026-04-09 | [summary](summaries/tc-12-leap-day.md)               |
@@ -585,6 +691,28 @@ Does `<Mask>MM/dd/yyyy</Mask>` on a calendar field affect stored values, GetFiel
 | 14-C-API   | C                | API read (getForms) | (after 14-C-save)       | field6=`"2026-03-15T00:00:00Z"` — server stores with Z                                                        | Server-side care about mask?     | PASS   | 2026-04-13 | [summary](summaries/tc-14-C-API.md)   |
 | 14-D-API   | D                | API read (getForms) | (after 14-D-save)       | field5=`"2026-03-15T00:00:00Z"` — **identical to Config C**                                                   | Server-side care about mask?     | PASS   | 2026-04-13 | [summary](summaries/tc-14-D-API.md)   |
 
+### Phase D — Platform-Default Calendar Mask (T3)
+
+Does the Central Admin **Forms → "Calendar Field Default Mask"** setting (currently blank on all envs) apply to calendar fields that do **not** have their own `<Mask>` in the template? Distinct from Phase A-C's per-field mask. Platform-level control means it affects _every_ calendar field at once.
+
+**Environment**: EmanuelJofre (DB scope or Customer scope — test both to verify cascade). Toggle via `tab=ConfigSettings` (Customer) or `tab=DatabaseSettings` (Database), then Configuration Sections dropdown → Forms → "Calendar Field Default Mask".
+**Method**: Set platform-default mask to `MM/dd/yyyy`, rerun the same slots as Phase A but on unmasked fields. Compare against Phase A baseline to detect any difference.
+**Test fields**: Field5 (Config D) and Field6 (Config C) — neither has a per-field mask.
+**Hypothesis**: If the platform default applies, behavior should match Cat 14 Phase B/C (per-field masked fields). If it doesn't, behavior is identical to Phase A.
+
+| Test ID            | Config           | Scope          | Input / Action                                                | Expected (no platform mask = Phase A) | With platform mask = `MM/dd/yyyy`     | Status  | Run Date | Evidence |
+| ------------------ | ---------------- | -------------- | ------------------------------------------------------------- | ------------------------------------- | ------------------------------------- | ------- | -------- | -------- |
+| 14-D-C-SFV.T3      | C (DateTime)     | DB-scope       | SFV `"2026-03-15T14:30:00"`                                   | raw=`"2026-03-15T14:30:00"`           | Same (display-only) / Truncated time? | PENDING | —        | —        |
+| 14-D-D-SFV.T3      | D (DateTime+iTZ) | DB-scope       | SFV `"2026-03-15T14:30:00"`                                   | raw=`"2026-03-15T14:30:00"`           | Same / Truncated?                     | PENDING | —        | —        |
+| 14-D-C-popup.T3    | C                | DB-scope       | Calendar popup 3/15/2026                                      | raw=`"2026-03-15T00:00:00"`           | Time picker hidden? Different raw?    | PENDING | —        | —        |
+| 14-D-D-popup.T3    | D                | DB-scope       | Calendar popup 3/15/2026                                      | raw=`"2026-03-15T00:00:00"`           | Time picker hidden? Different raw?    | PENDING | —        | —        |
+| 14-D-A-SFV.T3      | A (date-only)    | DB-scope       | SFV `"2026-03-15"`                                            | raw=`"2026-03-15"`                    | No-op (already date-only)             | PENDING | —        | —        |
+| 14-D-scope-cascade | C                | Customer vs DB | Set T3 at Customer only, then DB overrides to different value | Observe which value applies           | Verify DB > Customer cascade for T3   | PENDING | —        | —        |
+
+> **Why this matters for WADNR**: 54/137 WADNR calendar fields already have per-field masks. If a platform default is set, it retroactively affects the other 83 unmasked fields. Also means a "mask-free baseline" on a customer depends on the platform-default value, not just the absence of `<Mask>` in the template.
+
+---
+
 ## 15 — Kendo Widget Comparison
 
 Captures Kendo widget internals and VV framework properties on each environment. Run separately on vvdemo (v1) and vv5dev (v2), then diff.
@@ -632,3 +760,157 @@ Does the VV server UTC offset affect the form save→reload→API-read pipeline?
 | 16-A-controls | A                | (after save)  | —                       | Both: raw=`"2026-03-15"` — **IDENTICAL**                                  | PASS   | 2026-04-13 | [summary](summaries/tc-16-A-controls.md) |
 | 16-C-controls | C                | (after save)  | —                       | Both: raw=`"2026-03-15T00:00:00"` — **IDENTICAL**                         | PASS   | 2026-04-13 | [summary](summaries/tc-16-C-controls.md) |
 | 16-D-controls | D                | (after save)  | —                       | Both: raw=`"2026-03-15T14:30:00"` — **IDENTICAL** (Bug #5 fake Z on both) | PASS   | 2026-04-13 | [summary](summaries/tc-16-D-controls.md) |
+
+---
+
+### Group: Platform Scope
+
+Cats 17-19 exercise the Central Admin **Platform Scope** dimension — toggles and customer settings that modulate the _pipeline_ rather than the _field_. These slots use explicit scope suffixes on their IDs (see [ID Convention](#id-convention) and [Platform Scope](#platform-scope)).
+
+## 17 — Platform TZ Conversion Toggles (T1/T2)
+
+Central Admin **Forms → Configuration Sections → Forms** offers two toggles we've never exercised:
+
+- **T1** "Convert Date Fields to Customer Timezone" — unknown pipeline; likely injects a customer-TZ normalization step somewhere in the Forms save/load chain.
+- **T2** "Prevent Conversion For Dates Ignoring Timezones" — only meaningful when T1 is on; overrides T1 for fields with `ignoreTimezone=true`.
+
+Both default OFF. Turning one (or both) on could **fix FORM-BUG-5/7, create a new bug, or do nothing**. All three outcomes are meaningful. Customer TZ on the test env is the one from the Customer Details tab (UTC for vv5dev/EmanuelJofre; BRT for vvdemo).
+
+**Environment**: EmanuelJofre (has CA access on vv5dev; also on vvdemo for T1/T2 at customer scope).
+**Method**: Toggle T1 (and T2) at database scope. Re-run a core subset of Cat 1 / Cat 7 / Cat 8 slots on the 4 `ignoreTimezone`-sensitive configs (B, D, F, H) across 3 TZs. Compare to baseline.
+**Spec**: `cat-17-tz-conversion-toggles.spec.js` (to be created).
+**Bugs potentially exercised**: FORM-BUG-5 (Config D), FORM-BUG-7 (Configs A/B), and a potential **new bug** if T1 over-converts (double shift) or misapplies to date-only fields.
+
+**Shape**: 4 toggle combos × 4 configs × 3 TZs = **48 slots**. Toggle combos:
+
+|        | T1 OFF                       | T1 ON          |
+| ------ | ---------------------------- | -------------- |
+| T2 OFF | (default = Cat 1 baseline)   | `.T1` scope    |
+| T2 ON  | (no effect — T2 requires T1) | `.T1+T2` scope |
+
+Three toggle tokens give us a practical 3 variants × 4 configs × 3 TZs = 36 slots, plus a 12-slot control set rerunning `.baseline` on the same configs to confirm no regression from the toggle flip. Grand total **48 PENDING**.
+
+| Test ID              | Config |  TZ   | Scope    | Baseline Expected (T1/T2 off)                                                       | Probe Question                                                                 | Status  | Run Date | Evidence |
+| -------------------- | :----: | :---: | -------- | ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ | ------- | -------- | -------- |
+| 17-B-BRT.T1          |   B    |  BRT  | `.T1`    | `"2026-03-15"` (date-only)                                                          | Does T1 date-only become a datetime? Any shift?                                | PENDING | —        | —        |
+| 17-B-IST.T1          |   B    |  IST  | `.T1`    | `"2026-03-14"` (FORM-BUG-7)                                                         | Does T1 fix the -1 day shift?                                                  | PENDING | —        | —        |
+| 17-B-UTC0.T1         |   B    | UTC+0 | `.T1`    | `"2026-03-15"`                                                                      | Control (no shift at UTC+0)                                                    | PENDING | —        | —        |
+| 17-D-BRT.T1          |   D    |  BRT  | `.T1`    | `"2026-03-15T00:00:00"` + fake Z (FORM-BUG-5)                                       | Does T1 fix fake Z? Does stored value change?                                  | PENDING | —        | —        |
+| 17-D-IST.T1          |   D    |  IST  | `.T1`    | `"2026-03-15T00:00:00"` + fake Z                                                    | Same. Also: does round-trip drift disappear?                                   | PENDING | —        | —        |
+| 17-D-UTC0.T1         |   D    | UTC+0 | `.T1`    | `"2026-03-15T00:00:00"` + fake Z (0 drift)                                          | Control                                                                        | PENDING | —        | —        |
+| 17-F-BRT.T1          |   F    |  BRT  | `.T1`    | `"2026-03-15"` (legacy date-only)                                                   | T1 affect legacy path?                                                         | PENDING | —        | —        |
+| 17-F-IST.T1          |   F    |  IST  | `.T1`    | `"2026-03-14"` (FORM-BUG-7, legacy path)                                            | Same                                                                           | PENDING | —        | —        |
+| 17-F-UTC0.T1         |   F    | UTC+0 | `.T1`    | `"2026-03-15"`                                                                      | Control                                                                        | PENDING | —        | —        |
+| 17-H-BRT.T1          |   H    |  BRT  | `.T1`    | `"2026-03-15T00:00:00"` (no fake Z — legacy)                                        | T1 flip the legacy no-fake-Z behavior?                                         | PENDING | —        | —        |
+| 17-H-IST.T1          |   H    |  IST  | `.T1`    | `"2026-03-15T00:00:00"`                                                             | Same                                                                           | PENDING | —        | —        |
+| 17-H-UTC0.T1         |   H    | UTC+0 | `.T1`    | `"2026-03-15T00:00:00"`                                                             | Control                                                                        | PENDING | —        | —        |
+| 17-B-BRT.T1+T2       |   B    |  BRT  | `.T1+T2` | (same as `.T1`)                                                                     | T2 over-ride: does ignoreTZ=true short-circuit the T1 conversion?              | PENDING | —        | —        |
+| 17-B-IST.T1+T2       |   B    |  IST  | `.T1+T2` | (FORM-BUG-7 under T1 = ?)                                                           | Does T2 restore the un-shifted value on ignoreTZ fields?                       | PENDING | —        | —        |
+| 17-B-UTC0.T1+T2      |   B    | UTC+0 | `.T1+T2` | Control                                                                             | Control                                                                        | PENDING | —        | —        |
+| 17-D-BRT.T1+T2       |   D    |  BRT  | `.T1+T2` | (same as `.T1`)                                                                     | Does T2 preserve the fake-Z behavior on Config D?                              | PENDING | —        | —        |
+| 17-D-IST.T1+T2       |   D    |  IST  | `.T1+T2` | (same as `.T1`)                                                                     | Same                                                                           | PENDING | —        | —        |
+| 17-D-UTC0.T1+T2      |   D    | UTC+0 | `.T1+T2` | Control                                                                             | Control                                                                        | PENDING | —        | —        |
+| 17-F-BRT.T1+T2       |   F    |  BRT  | `.T1+T2` | (same as `.T1`)                                                                     | T2 on legacy date-only ignoreTZ                                                | PENDING | —        | —        |
+| 17-F-IST.T1+T2       |   F    |  IST  | `.T1+T2` | (same as `.T1`)                                                                     | Same                                                                           | PENDING | —        | —        |
+| 17-F-UTC0.T1+T2      |   F    | UTC+0 | `.T1+T2` | Control                                                                             | Control                                                                        | PENDING | —        | —        |
+| 17-H-BRT.T1+T2       |   H    |  BRT  | `.T1+T2` | (same as `.T1`)                                                                     | T2 on legacy DateTime+ignoreTZ — expect identical to baseline (T1 neutralized) | PENDING | —        | —        |
+| 17-H-IST.T1+T2       |   H    |  IST  | `.T1+T2` | (same as `.T1`)                                                                     | Same                                                                           | PENDING | —        | —        |
+| 17-H-UTC0.T1+T2      |   H    | UTC+0 | `.T1+T2` | Control                                                                             | Control                                                                        | PENDING | —        | —        |
+| 17-B-BRT.baseline    |   B    |  BRT  | —        | `"2026-03-15"`                                                                      | Control: rerun with T1/T2 off after flipping them to ensure no state leak      | PENDING | —        | —        |
+| 17-B-IST.baseline    |   B    |  IST  | —        | `"2026-03-14"`                                                                      | Control                                                                        | PENDING | —        | —        |
+| 17-B-UTC0.baseline   |   B    | UTC+0 | —        | `"2026-03-15"`                                                                      | Control                                                                        | PENDING | —        | —        |
+| 17-D-BRT.baseline    |   D    |  BRT  | —        | `"2026-03-15T00:00:00"` + fake Z                                                    | Control                                                                        | PENDING | —        | —        |
+| 17-D-IST.baseline    |   D    |  IST  | —        | `"2026-03-15T00:00:00"` + fake Z                                                    | Control                                                                        | PENDING | —        | —        |
+| 17-D-UTC0.baseline   |   D    | UTC+0 | —        | `"2026-03-15T00:00:00"` + fake Z                                                    | Control                                                                        | PENDING | —        | —        |
+| 17-F-BRT.baseline    |   F    |  BRT  | —        | `"2026-03-15"`                                                                      | Control                                                                        | PENDING | —        | —        |
+| 17-F-IST.baseline    |   F    |  IST  | —        | `"2026-03-14"`                                                                      | Control                                                                        | PENDING | —        | —        |
+| 17-F-UTC0.baseline   |   F    | UTC+0 | —        | `"2026-03-15"`                                                                      | Control                                                                        | PENDING | —        | —        |
+| 17-H-BRT.baseline    |   H    |  BRT  | —        | `"2026-03-15T00:00:00"`                                                             | Control                                                                        | PENDING | —        | —        |
+| 17-H-IST.baseline    |   H    |  IST  | —        | `"2026-03-15T00:00:00"`                                                             | Control                                                                        | PENDING | —        | —        |
+| 17-H-UTC0.baseline   |   H    | UTC+0 | —        | `"2026-03-15T00:00:00"`                                                             | Control                                                                        | PENDING | —        | —        |
+| 17-sfv-round-B       |   B    |  IST  | `.T1`    | `"2026-03-14"` then SFV→GFV→SFV                                                     | Does round-trip drift change under T1?                                         | PENDING | —        | —        |
+| 17-sfv-round-D       |   D    |  IST  | `.T1`    | +5:30h/trip                                                                         | Same                                                                           | PENDING | —        | —        |
+| 17-sfv-round-B-T2    |   B    |  IST  | `.T1+T2` | (per T2 semantics)                                                                  | Does T2 restore stable round-trip?                                             | PENDING | —        | —        |
+| 17-sfv-round-D-T2    |   D    |  IST  | `.T1+T2` | (per T2 semantics)                                                                  | Does T2 restore stable round-trip?                                             | PENDING | —        | —        |
+| 17-ws-D-T1           |   D    |  BRT  | `.T1`    | WS postForms `"2026-03-15T00:00:00.000Z"` → Forms read                              | Does T1 change cross-layer behavior? (cross-ref WS-11)                         | PENDING | —        | —        |
+| 17-ws-D-T1+T2        |   D    |  BRT  | `.T1+T2` | Same WS input                                                                       | Does T2 preserve Forms V1 re-interpretation?                                   | PENDING | —        | —        |
+| 17-bug5-fixed-check  |   D    |  BRT  | `.T1`    | Round-trip should produce 0 drift IF T1 fixes FORM-BUG-5                            | Hypothesis test                                                                | PENDING | —        | —        |
+| 17-bug7-fixed-check  |   A    |  IST  | `.T1`    | Stored date should be Mar 15 (not Mar 14) IF T1 fixes FORM-BUG-7                    | Hypothesis test                                                                | PENDING | —        | —        |
+| 17-bug5-T2-preserve  |   D    |  BRT  | `.T1+T2` | Round-trip should return to -3h drift IF T2 restores pre-T1 behavior                | Hypothesis test                                                                | PENDING | —        | —        |
+| 17-config-C-T1       |   C    |  BRT  | `.T1`    | Config C has `ignoreTZ=false` — T1 applies in full. Cross-reference with C baseline | Probe                                                                          | PENDING | —        | —        |
+| 17-config-A-T1       |   A    |  IST  | `.T1`    | Config A has `ignoreTZ=false` — expect T1 applies; does it fix FORM-BUG-7?          | Hypothesis test                                                                | PENDING | —        | —        |
+| 17-cust-tz-change    |   D    |  BRT  | `.T1`    | Change Customer TZ mid-test; verify `Minutes to Cache Time Zone Value = 20` applies | Cross-ref Cat 19                                                               | PENDING | —        | —        |
+| 17-customer-scope-T1 |   D    |  BRT  | `.T1`    | Set T1 at customer scope only (not DB) — verify cascade: DB off > Customer on = off | Scope precedence test                                                          | PENDING | —        | —        |
+
+> **Expected Value approach for Cat 17**: We don't know the pipeline behavior yet. The "Expected" column above records **baseline (T1/T2 off) behavior** and the "Probe Question" column records what we're measuring. After first run, fill in "Actual" and convert "Probe Question" into a concrete expected value for the second pass. This is exploratory testing — treat first-run failures as **data collection**, not regression signal.
+
+---
+
+## 18 — Customer Culture (locale)
+
+Central Admin **Customer Details → Culture** (customer scope) controls server-rendered date formats and parsing expectations. All existing slots assume `English (United States)` (MM/DD/YYYY). A customer on `Portuguese (Brazil)` (DD/MM/YYYY) or `Spanish (Spain)` (DD/MM/YYYY) may behave differently — particularly for:
+
+- Input format tolerance (WS-BUG-2/3 "DD/MM silently discarded" may **flip** under ptBR — DD/MM becomes the intended format)
+- Display format on reload (user sees `15/03/2026` not `03/15/2026`)
+- Kendo widget parseFormats
+- Typed input auto-parse (Cat 2 under `.ptBR` scope)
+
+**Environment**: EmanuelJofre (both vvdemo and vv5dev — change via Central Admin Customer Details).
+**Method**: Change customer Culture to `Portuguese (Brazil)`. Rerun a core subset of Cat 2 (typed input) and Cat 7 (SFV format tolerance) slots with DD/MM inputs. Verify both parse success and stored-value round-trip.
+**Spec**: `cat-18-culture.spec.js` (to be created).
+**Bugs potentially exercised**: WEBSERVICE-BUG-2/3 (cross-ref in WS-12), potential new bug if Forms and API disagree on Culture source.
+
+**Shape**: 5 input formats × 2 cultures × 2 configs (A date-only, D DateTime+iTZ) = **20 slots**.
+
+| Test ID             | Config | Culture | TZ  | Input (form display)  | Expected raw                   | Probe                                                         | Status  | Run Date | Evidence |
+| ------------------- | :----: | :-----: | :-: | --------------------- | ------------------------------ | ------------------------------------------------------------- | ------- | -------- | -------- |
+| 18-A-ptBR-ddmm      |   A    |  ptBR   | BRT | `15/03/2026`          | `"2026-03-15"`                 | Does typed DD/MM parse correctly under ptBR?                  | PENDING | —        | —        |
+| 18-A-ptBR-mmdd      |   A    |  ptBR   | BRT | `03/15/2026`          | Parse fail OR parse as Mar 15? | Does MM/DD still work as fallback under ptBR?                 | PENDING | —        | —        |
+| 18-A-ptBR-iso       |   A    |  ptBR   | BRT | `2026-03-15`          | `"2026-03-15"`                 | ISO format Culture-independent?                               | PENDING | —        | —        |
+| 18-A-ptBR-ambiguous |   A    |  ptBR   | BRT | `03/04/2026`          | `"2026-04-03"` (Apr 3 DD/MM)   | Ambiguous date under ptBR — opposite interpretation from enUS | PENDING | —        | —        |
+| 18-A-ptBR-invalid   |   A    |  ptBR   | BRT | `15/15/2026`          | Parse fail                     | Invalid under any Culture                                     | PENDING | —        | —        |
+| 18-D-ptBR-ddmm      |   D    |  ptBR   | BRT | `15/03/2026 14:30`    | `"2026-03-15T14:30:00"`        | DateTime DD/MM + time                                         | PENDING | —        | —        |
+| 18-D-ptBR-mmdd      |   D    |  ptBR   | BRT | `03/15/2026 14:30`    | Parse fail or tolerant?        | Mixed Culture on DateTime field                               | PENDING | —        | —        |
+| 18-D-ptBR-iso       |   D    |  ptBR   | BRT | `2026-03-15T14:30:00` | `"2026-03-15T14:30:00"`        | ISO format                                                    | PENDING | —        | —        |
+| 18-D-ptBR-ambiguous |   D    |  ptBR   | BRT | `03/04/2026 14:30`    | `"2026-04-03T14:30:00"`        | Ambiguous DateTime                                            | PENDING | —        | —        |
+| 18-D-ptBR-invalid   |   D    |  ptBR   | BRT | `31/02/2026`          | Parse fail                     | Invalid under any Culture                                     | PENDING | —        | —        |
+| 18-A-enUS-ddmm      |   A    |  enUS   | BRT | `15/03/2026`          | Parse fail OR parse as Mar 15? | Control: DD/MM under enUS (same as WEBSERVICE-BUG-2)          | PENDING | —        | —        |
+| 18-A-enUS-mmdd      |   A    |  enUS   | BRT | `03/15/2026`          | `"2026-03-15"`                 | Control: MM/DD default                                        | PENDING | —        | —        |
+| 18-A-enUS-iso       |   A    |  enUS   | BRT | `2026-03-15`          | `"2026-03-15"`                 | Control                                                       | PENDING | —        | —        |
+| 18-A-enUS-ambiguous |   A    |  enUS   | BRT | `03/04/2026`          | `"2026-03-04"` (Mar 4 MM/DD)   | Control: opposite interpretation from ptBR                    | PENDING | —        | —        |
+| 18-A-enUS-invalid   |   A    |  enUS   | BRT | `15/15/2026`          | Parse fail                     | Control                                                       | PENDING | —        | —        |
+| 18-D-enUS-ddmm      |   D    |  enUS   | BRT | `15/03/2026 14:30`    | Parse fail OR parse as Mar 15? | Control                                                       | PENDING | —        | —        |
+| 18-D-enUS-mmdd      |   D    |  enUS   | BRT | `03/15/2026 14:30`    | `"2026-03-15T14:30:00"`        | Control                                                       | PENDING | —        | —        |
+| 18-D-enUS-iso       |   D    |  enUS   | BRT | `2026-03-15T14:30:00` | `"2026-03-15T14:30:00"`        | Control                                                       | PENDING | —        | —        |
+| 18-D-enUS-ambiguous |   D    |  enUS   | BRT | `03/04/2026 14:30`    | `"2026-03-04T14:30:00"`        | Control                                                       | PENDING | —        | —        |
+| 18-D-enUS-invalid   |   D    |  enUS   | BRT | `31/02/2026 14:30`    | Parse fail                     | Control                                                       | PENDING | —        | —        |
+
+> **Cross-cutting**: WS-12 tests the same Culture dimension at the REST API layer. DB-9 tests dashboard display format. Synchronize findings.
+> **"Current Culture" override**: General Configuration Section has its own "Current Culture:" text input. If set, it may shadow the Details-tab Culture. Capture both settings before the run; if they differ, probe which wins.
+
+---
+
+## 19 — Server-Generated Timestamps
+
+Forms and workflows generate timestamps via four server-side mechanisms: **Created Date** auto-fields (on form save), **`DateTime.Now`** in Node.js/C# scripts, **`GETDATE()`** in SQL queries (via custom queries / web services), and **workflow due-date** computation. All should respect the **Customer Time Zone** (set in Central Admin Customer Details tab). Untested.
+
+**Environment**: EmanuelJofre-vv5dev (Customer TZ = UTC), EmanuelJofre-vvdemo (Customer TZ = BRT). These two envs give us a free TZ comparison if we can reach server-generated timestamps on both.
+**Method**: Capture server timestamps at known wall-clock moments, compute expected UTC offset based on Customer TZ, compare.
+**Spec**: `cat-19-server-timestamps.spec.js` (to be created). Depends on extract of a customer form with an auto-Created-Date field.
+**Cross-reference**: [Scheduled Processes matrix](../scheduled-processes/matrix.md) for SP trigger-time semantics; [Workflows matrix](../workflows/matrix.md) for due-date computation.
+
+**Shape**: 4 mechanisms × 2 Customer TZs = **8 slots**.
+
+| Test ID         | Mechanism                                                    | Customer TZ | Test TZ (browser) | Expected                                                                    | Status  | Run Date | Evidence |
+| --------------- | ------------------------------------------------------------ | ----------- | ----------------- | --------------------------------------------------------------------------- | ------- | -------- | -------- |
+| 19-created-UTC  | Created Date auto-field on save                              | UTC         | BRT               | Timestamp matches UTC wall-clock, not browser BRT                           | PENDING | —        | —        |
+| 19-created-BRT  | Created Date auto-field on save                              | BRT         | UTC               | Timestamp matches BRT wall-clock                                            | PENDING | —        | —        |
+| 19-now-UTC      | `DateTime.Now` in Node.js script (WS-9 variant)              | UTC         | BRT               | Script returns UTC-aligned timestamp                                        | PENDING | —        | —        |
+| 19-now-BRT      | `DateTime.Now` in Node.js script                             | BRT         | UTC               | Script returns BRT-aligned timestamp                                        | PENDING | —        | —        |
+| 19-getdate-UTC  | `GETDATE()` via custom query                                 | UTC         | BRT               | SQL returns UTC-aligned (or SQL-server-OS timestamp — test what VV exposes) | PENDING | —        | —        |
+| 19-getdate-BRT  | `GETDATE()` via custom query                                 | BRT         | UTC               | Same                                                                        | PENDING | —        | —        |
+| 19-workflow-UTC | Workflow task "Default Days for an Approval Task=5" due-date | UTC         | BRT               | Due date = now + 5 days, computed in Customer TZ (UTC)                      | PENDING | —        | —        |
+| 19-workflow-BRT | Workflow task due-date                                       | BRT         | UTC               | Due date = now + 5 days, computed in Customer TZ (BRT)                      | PENDING | —        | —        |
+
+> **Why Customer TZ matters for server timestamps**: The `Server Farm → Minutes to Cache Time Zone Value = 20` setting caches the Customer TZ on the client for 20 min. A customer-TZ change won't reach the server-timestamp generator until the cache invalidates. Cat 17 has a `17-cust-tz-change` row that cross-references this.
+> **`DateTime.Now` note**: In the harness Express server, `DateTime.Now` uses the server OS TZ, not Customer TZ. If the harness is the active microservice runtime, observed timestamps depend on which container runs the code. Document this when running Cat 19 on vv5dev (harness routes to `https://nodejs-preprod.visualvault.com` per `Other → Scripting Server Url`).

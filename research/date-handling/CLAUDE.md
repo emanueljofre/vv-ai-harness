@@ -6,15 +6,18 @@ Comprehensive investigation of date handling defects across **all VisualVault co
 
 ## Scope
 
-| Component                           | Status      | Folder                                                                                                            |
-| ----------------------------------- | ----------- | ----------------------------------------------------------------------------------------------------------------- |
-| **Forms — Calendar Fields**         | In Progress | `forms-calendar/` (Cat 1-13 complete, Cat 14 Phase A done, Cat 15-16 complete, JSON template validation complete) |
-| **Web Services (REST API)**         | Complete    | `web-services/` (validated on WADNR 2026-04-10)                                                                   |
-| **Analytic Dashboards**             | Complete    | `dashboards/` (validated on WADNR 2026-04-10)                                                                     |
-| **VisualVault Reports**             | Not Started | `reports/` (future)                                                                                               |
-| **Document Library (index fields)** | In Progress | `document-library/` (matrix: 8 categories, 52 slots)                                                              |
-| **Workflows (date triggers)**       | Not Started | `workflows/` (future)                                                                                             |
-| **Node.js Client Library**          | Not Started | `node-client/` (future)                                                                                           |
+| Component                           | Status      | Folder                                                                                                         |
+| ----------------------------------- | ----------- | -------------------------------------------------------------------------------------------------------------- |
+| **Forms — Calendar Fields**         | In Progress | `forms-calendar/` (269 baselined + 82 backlog — Cat 17/18/19 new 2026-04-20 for platform-scope toggles)        |
+| **Web Services (REST API)**         | In Progress | `web-services/` (148 baselined on WADNR 2026-04-10 + 18 backlog — WS-11/12/13 new 2026-04-20)                  |
+| **Analytic Dashboards**             | In Progress | `dashboards/` (44 baselined on WADNR 2026-04-10 + 12 backlog — DB-9 Culture new 2026-04-20)                    |
+| **Document Library (index fields)** | In Progress | `document-library/` (52 baselined + 16 backlog — DOC-9 Culture and DOC-10 lifecycle defaults new 2026-04-20)   |
+| **Workflows (date triggers)**       | Not Started | `workflows/` — 22 PENDING slots scaffolded 2026-04-20 (WF-1 due-date, WF-2 work-week, WF-3 escalation, WF-4-6) |
+| **Scheduled Processes (date)**      | Not Started | `scheduled-processes/` — 14 PENDING slots scaffolded 2026-04-20 (SP-1 fire window, SP-2 script clock, SP-3/4)  |
+| **VisualVault Reports**             | Not Started | `reports/` (future)                                                                                            |
+| **Node.js Client Library**          | Not Started | `node-client/` (future)                                                                                        |
+
+> **2026-04-20 expansion**: Central Admin mapping revealed the three-scope hierarchy (Environment / Customer / Database) and the full inventory of date-affecting toggles. Each matrix now carries a `Platform Scope` section, scope-suffix ID convention, and an `Open Gaps & Backlog` section. See [`projects/emanueljofre-vv5dev/analysis/central-admin/SCOPE-HIERARCHY.md`](../../projects/emanueljofre-vv5dev/analysis/central-admin/SCOPE-HIERARCHY.md) for the scope catalog.
 
 ## Folder Structure
 
@@ -65,7 +68,7 @@ See `forms-calendar/matrix.md` for current coverage status.
 
 ### Key Context
 
-- **V1 vs V2**: Two init paths gated by `useUpdatedCalendarValueLogic`. All live tests use V1 (default). See `forms-calendar/analysis/overview.md` § V1 vs V2.
+- **V1 vs V2**: Two init paths gated by `useUpdatedCalendarValueLogic`, controlled by the **"Use Updated Calendar Control Logic"** checkbox in Central Admin (Database scope wins over Customer scope; pushed via `setUserInfo()`). Tests on vvdemo/EmanuelJofre-vvdemo and WADNR run V1 (box unchecked at both scopes); tests on vv5dev/EmanuelJofre-vv5dev run **V2** (DB-scope checked). See `forms-calendar/analysis/overview.md` § V1 vs V2 and [`docs/architecture/visualvault-platform.md § Central Admin`](../../docs/architecture/visualvault-platform.md#central-admin-cross-customer-control-panel).
 - **Code paths**: SetFieldValue, GetFieldValue, form load, save — documented in `forms-calendar/analysis/overview.md` § Confirmed Code Paths.
 - **Test assets by environment**: [`projects/emanueljofre-vvdemo/test-assets.md`](../../projects/emanueljofre-vvdemo/test-assets.md) (read-write), [`projects/wadnr/test-assets.md`](../../projects/wadnr/test-assets.md) (read-only)
 - **Customer-scoped analyses**: [`projects/wadnr/analysis/date-handling-current-state.md`](../../projects/wadnr/analysis/date-handling-current-state.md) — 11-layer catalogue + per-config (B/C/D) scenario walkthroughs across PST/EST/UTC + XLAYER matrix + risk register for WADNR.
@@ -79,7 +82,7 @@ Tests run via Playwright (see root `CLAUDE.md` § Browser Automation). Cross-tim
 
 ### What Has NOT Been Tested
 
-- `useUpdatedCalendarValueLogic=true` — V2 code path never exercised live
+- V2 code path (`useUpdatedCalendarValueLogic=true`) runs live on vv5dev/EmanuelJofre-vv5dev (DB-scope Central Admin toggle). Initial V2 chromium baseline captured 2026-04-20 (405 executed / 51 passed / 354 failed) — see [`projects/emanueljofre-vv5dev/testing/date-handling/status.md`](../../projects/emanueljofre-vv5dev/testing/date-handling/status.md) and `failures.json`. Expected values in specs are predominantly V1-baselined; next iteration needs V2-specific expected values per TC. **First V2-scoped entries landed 2026-04-20**: 8 `.V2` entries for `11-{A..H}-save-BRT-load-IST` in `testing/fixtures/test-data.js` (gated by a runtime `scope` filter in `cat-11-cross-timezone.spec.js`) and the new parameterized `cat-15-audit.spec.js`. See the V2-scope baseline sub-table in [`forms-calendar/matrix.md`](forms-calendar/matrix.md#v2-scope-baseline-emanueljofre-vv5dev-db-scope-use-updated-calendar-control-logic--on).
 - V1 load path FORM-BUG-7 in IST — code-confirmed but no live test
 - Preset/Current Date with `enableTime=true` fields — needs new form fields
 - Category 2 legacy typed input (E-H) across all TZs

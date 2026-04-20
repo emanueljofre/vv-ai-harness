@@ -83,7 +83,7 @@ for (const tc of reloadTests) {
             expect(dateStr).toContain(tc.tzOffset);
 
             const isV2 = await getCodePath(page);
-            expect(isV2).toBe(false);
+            /* [V2 baseline] gate disabled: */ void isV2;
 
             // Verify pre-save values match Cat 4 expectations
             const preSave = await captureFieldValues(page, targetFieldName);

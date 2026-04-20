@@ -23,8 +23,9 @@ const vvConfig = loadConfig();
 // Per-customer form template URLs.
 // Each customer has its own test harness forms with different GUIDs.
 // xcid/xcdid accept alias strings (e.g., "EmanuelJofre"/"Main") as well as GUIDs.
+// Keys match the .env.json customer key (e.g., "EmanuelJofre-vvdemo", "EmanuelJofre-vv5dev").
 const CUSTOMER_TEMPLATES = {
-    EmanuelJofre: {
+    'EmanuelJofre-vvdemo': {
         dateTest:
             '/FormViewer/app?hidemenu=true' +
             '&formid=6be0265c-152a-f111-ba23-0afff212cc87' +
@@ -35,6 +36,27 @@ const CUSTOMER_TEMPLATES = {
             '&formid=203734a0-5433-f111-ba23-0afff212cc87' +
             '&xcid=815eb44d-5ec8-eb11-8200-a8333ebd7939' +
             '&xcdid=845eb44d-5ec8-eb11-8200-a8333ebd7939',
+    },
+    'EmanuelJofre-vv5dev': {
+        // "Date Test Harness" form — 24 calendar fields with semantic names
+        dateTest:
+            '/FormViewer/app?hidemenu=true' +
+            '&formid=378b683e-f36b-1410-85ef-001e45e95bc5' +
+            '&xcid=EmanuelJofre' +
+            '&xcdid=Main',
+        // "Target Date Test Harness" — same fields as Date Test Harness with enableQListener=true for Category 4
+        targetDateTest:
+            '/FormViewer/app?hidemenu=true' +
+            '&formid=34d80a90-f23c-f111-8312-f68855a47462' +
+            '&xcid=EmanuelJofre' +
+            '&xcdid=Main',
+        // Data-detail dashboards (DB-6 cross-layer). Origin = Date Test Harness records; Target = Target Date Test Harness records.
+        dashboardDateTest:
+            'https://vv5dev.visualvault.com/app/EmanuelJofre/Main/FormDataDetails' +
+            '?Mode=ReadOnly&ReportID=b80eb7f6-dd3c-f111-8312-f68855a47462',
+        dashboardTargetDateTest:
+            'https://vv5dev.visualvault.com/app/EmanuelJofre/Main/FormDataDetails' +
+            '?Mode=ReadOnly&ReportID=0a00a253-f33c-f111-8312-f68855a47462',
     },
     WADNR: {
         dateTest:
@@ -50,7 +72,11 @@ const CUSTOMER_TEMPLATES = {
     },
 };
 
-const customerTemplates = CUSTOMER_TEMPLATES[vvConfig.customerAlias] || CUSTOMER_TEMPLATES.EmanuelJofre;
+// Resolve by customer key from .env.json first, then fall back to customerAlias for backward compat.
+const customerTemplates =
+    CUSTOMER_TEMPLATES[vvConfig.customerKey] ||
+    CUSTOMER_TEMPLATES[vvConfig.customerAlias] ||
+    CUSTOMER_TEMPLATES['EmanuelJofre-vvdemo'];
 
 // Per-customer document library test assets.
 // Each customer needs a test folder with a Date index field and at least one test document.
@@ -88,7 +114,7 @@ const TARGET_FORM_TEMPLATE_URL = customerTemplates.targetDateTest || null;
 //
 // Field3/4 are duplicates of Field1/2 (not used in formal tests).
 // Field8/9 do not exist (naming gap).
-const FIELD_MAP = {
+const FIELD_MAP_EMANUELJOFRE_VVDEMO = {
     A: {
         field: 'Field7',
         enableTime: false,
@@ -155,6 +181,85 @@ const FIELD_MAP = {
     },
 };
 
+// "Date Test Harness" form on vv5dev — semantic field names, 8 configs × 3 init modes.
+const FIELD_MAP_EMANUELJOFRE_VV5DEV = {
+    A: {
+        field: 'dateTzAwareV2Empty',
+        enableTime: false,
+        ignoreTimezone: false,
+        useLegacy: false,
+        preset: 'dateTzAwareV2Preset',
+        currentDate: 'dateTzAwareV2Today',
+    },
+    B: {
+        field: 'dateLocalV2Empty',
+        enableTime: false,
+        ignoreTimezone: true,
+        useLegacy: false,
+        preset: 'dateLocalV2Preset',
+        currentDate: 'dateLocalV2Today',
+    },
+    C: {
+        field: 'dateTimeUtcV2Empty',
+        enableTime: true,
+        ignoreTimezone: false,
+        useLegacy: false,
+        preset: 'dateTimeUtcV2Preset',
+        currentDate: 'dateTimeUtcV2Now',
+    },
+    D: {
+        field: 'dateTimeLocalV2Empty',
+        enableTime: true,
+        ignoreTimezone: true,
+        useLegacy: false,
+        preset: 'dateTimeLocalV2Preset',
+        currentDate: 'dateTimeLocalV2Now',
+    },
+    E: {
+        field: 'dateTzAwareLegacyEmpty',
+        enableTime: false,
+        ignoreTimezone: false,
+        useLegacy: true,
+        preset: 'dateTzAwareLegacyPreset',
+        currentDate: 'dateTzAwareLegacyToday',
+    },
+    F: {
+        field: 'dateLocalLegacyEmpty',
+        enableTime: false,
+        ignoreTimezone: true,
+        useLegacy: true,
+        preset: 'dateLocalLegacyPreset',
+        currentDate: 'dateLocalLegacyToday',
+    },
+    G: {
+        field: 'dateTimeUtcLegacyEmpty',
+        enableTime: true,
+        ignoreTimezone: false,
+        useLegacy: true,
+        preset: 'dateTimeUtcLegacyPreset',
+        currentDate: 'dateTimeUtcLegacyNow',
+    },
+    H: {
+        field: 'dateTimeLocalLegacyEmpty',
+        enableTime: true,
+        ignoreTimezone: true,
+        useLegacy: true,
+        preset: 'dateTimeLocalLegacyPreset',
+        currentDate: 'dateTimeLocalLegacyNow',
+    },
+};
+
+const FIELD_MAP_BY_CUSTOMER = {
+    'EmanuelJofre-vvdemo': FIELD_MAP_EMANUELJOFRE_VVDEMO,
+    'EmanuelJofre-vv5dev': FIELD_MAP_EMANUELJOFRE_VV5DEV,
+    WADNR: FIELD_MAP_EMANUELJOFRE_VVDEMO, // same Field-number naming as vvdemo
+};
+
+const FIELD_MAP =
+    FIELD_MAP_BY_CUSTOMER[vvConfig.customerKey] ||
+    FIELD_MAP_BY_CUSTOMER[vvConfig.customerAlias] ||
+    FIELD_MAP_EMANUELJOFRE_VVDEMO;
+
 // Record definitions for global-setup.js to create before tests run.
 // Each entry describes a form record to be saved via the browser UI, using the specified
 // input method per field. The global setup creates these records, extracts DataIDs via
@@ -164,93 +269,66 @@ const FIELD_MAP = {
 //   'popup'         — selectDateViaPopup() from vv-calendar.js
 //   'typed'         — typeDateInField() from vv-calendar.js
 //   'setFieldValue' — setFieldValue() from vv-form.js
+// Field names resolve via active FIELD_MAP so definitions work across environments.
+const BRT = 'America/Sao_Paulo';
+const IST = 'Asia/Calcutta';
+const DATE_INPUT = { year: 2026, month: 3, day: 15 };
 const RECORD_DEFINITIONS = [
     {
         key: 'cat3-A-BRT',
-        tz: 'America/Sao_Paulo',
+        tz: BRT,
         fields: [
-            { name: 'Field7', value: '03/15/2026', method: 'typed', input: { year: 2026, month: 3, day: 15 } },
-            {
-                name: 'Field5',
-                value: '03/15/2026 12:00 AM',
-                method: 'typed',
-                input: { year: 2026, month: 3, day: 15 },
-            },
+            { name: FIELD_MAP.A.field, value: '03/15/2026', method: 'typed', input: DATE_INPUT },
+            { name: FIELD_MAP.D.field, value: '03/15/2026 12:00 AM', method: 'typed', input: DATE_INPUT },
         ],
         description: 'BRT save, Config A + D = 03/15/2026 via typed input',
     },
     {
         key: 'cat3-AD-IST',
-        tz: 'Asia/Calcutta',
+        tz: IST,
         fields: [
-            { name: 'Field7', value: '03/15/2026', method: 'typed', input: { year: 2026, month: 3, day: 15 } },
-            {
-                name: 'Field5',
-                value: '03/15/2026 12:00 AM',
-                method: 'typed',
-                input: { year: 2026, month: 3, day: 15 },
-            },
+            { name: FIELD_MAP.A.field, value: '03/15/2026', method: 'typed', input: DATE_INPUT },
+            { name: FIELD_MAP.D.field, value: '03/15/2026 12:00 AM', method: 'typed', input: DATE_INPUT },
         ],
         description: 'IST save, Config A + D = 03/15/2026 via typed input',
     },
     {
         key: 'cat3-C-BRT',
-        tz: 'America/Sao_Paulo',
-        fields: [
-            {
-                name: 'Field6',
-                value: '03/15/2026 12:00 AM',
-                method: 'popup',
-                input: { year: 2026, month: 3, day: 15 },
-            },
-        ],
+        tz: BRT,
+        fields: [{ name: FIELD_MAP.C.field, value: '03/15/2026 12:00 AM', method: 'popup', input: DATE_INPUT }],
         description: 'BRT save, Config C = 03/15/2026 12:00 AM via popup',
     },
     {
         key: 'cat3-B-BRT',
-        tz: 'America/Sao_Paulo',
-        fields: [{ name: 'Field10', value: '03/15/2026', method: 'typed', input: { year: 2026, month: 3, day: 15 } }],
+        tz: BRT,
+        fields: [{ name: FIELD_MAP.B.field, value: '03/15/2026', method: 'typed', input: DATE_INPUT }],
         description: 'BRT save, Config B = 03/15/2026 via typed input',
     },
     {
         key: 'cat3-G-BRT',
-        tz: 'America/Sao_Paulo',
-        fields: [
-            {
-                name: 'Field14',
-                value: '03/15/2026 12:00 AM',
-                method: 'typed',
-                input: { year: 2026, month: 3, day: 15 },
-            },
-        ],
+        tz: BRT,
+        fields: [{ name: FIELD_MAP.G.field, value: '03/15/2026 12:00 AM', method: 'typed', input: DATE_INPUT }],
         description: 'BRT save, Config G (legacy DateTime) = 03/15/2026 12:00 AM via typed input',
     },
     {
         key: 'cat3-EF-BRT',
-        tz: 'America/Sao_Paulo',
+        tz: BRT,
         fields: [
-            { name: 'Field12', value: '03/15/2026', method: 'typed', input: { year: 2026, month: 3, day: 15 } },
-            { name: 'Field11', value: '03/15/2026', method: 'typed', input: { year: 2026, month: 3, day: 15 } },
+            { name: FIELD_MAP.E.field, value: '03/15/2026', method: 'typed', input: DATE_INPUT },
+            { name: FIELD_MAP.F.field, value: '03/15/2026', method: 'typed', input: DATE_INPUT },
         ],
         description: 'BRT save, Config E + F (legacy date-only) = 03/15/2026 via typed input',
     },
     {
         key: 'cat3-H-BRT',
-        tz: 'America/Sao_Paulo',
-        fields: [
-            {
-                name: 'Field13',
-                value: '03/15/2026 12:00 AM',
-                method: 'typed',
-                input: { year: 2026, month: 3, day: 15 },
-            },
-        ],
+        tz: BRT,
+        fields: [{ name: FIELD_MAP.H.field, value: '03/15/2026 12:00 AM', method: 'typed', input: DATE_INPUT }],
         description: 'BRT save, Config H (legacy DateTime + ignoreTZ) = 03/15/2026 12:00 AM via typed input',
     },
     {
         key: 'cat3-B-IST',
-        tz: 'Asia/Calcutta',
-        fields: [{ name: 'Field10', value: '03/15/2026', method: 'typed', input: { year: 2026, month: 3, day: 15 } }],
+        tz: IST,
+        fields: [{ name: FIELD_MAP.B.field, value: '03/15/2026', method: 'typed', input: DATE_INPUT }],
         description: 'IST save, Config B (date-only + ignoreTZ) = 03/15/2026 via typed input',
     },
 ];

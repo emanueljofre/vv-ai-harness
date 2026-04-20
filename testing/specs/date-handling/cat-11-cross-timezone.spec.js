@@ -24,7 +24,10 @@ const {
     roundTripCycle,
 } = require('../../helpers/vv-form');
 
-const categoryTests = TEST_DATA.filter((t) => t.category === 11);
+// Skip non-executable entries: umbrella slots aggregate child TCs, skip/theoretical
+// slots have no runnable scenario. They live in test-data.js for matrix linkage only.
+const NON_EXECUTABLE_ACTIONS = new Set(['umbrella', 'skip', 'theoretical']);
+const categoryTests = TEST_DATA.filter((t) => t.category === 11 && !NON_EXECUTABLE_ACTIONS.has(t.action));
 
 for (const tc of categoryTests) {
     test.describe(`TC-${tc.id}: ${tc.categoryName}, Config ${tc.config}`, () => {
@@ -39,10 +42,15 @@ for (const tc of categoryTests) {
             const dateStr = await getBrowserTimezone(page);
             expect(dateStr).toContain(tc.tzOffset);
 
-            // Verify code path (V1 vs V2)
+            // Verify code path (V1 vs V2) and skip if entry scope does not match.
+            // Entries default to V1 scope; .V2 entries set `scope: 'V2'`. V1 and V2
+            // coexist in TEST_DATA for the same category so we can track both
+            // baselines; the live env picks the matching set at runtime.
             const isV2 = await getCodePath(page);
+            const envScope = isV2 ? 'V2' : 'V1';
+            const entryScope = tc.scope || 'V1';
+            test.skip(envScope !== entryScope, `Entry scope=${entryScope} but active env is ${envScope}`);
             const fieldCfg = FIELD_MAP[tc.config];
-            expect(isV2).toBe(false);
 
             // Verify field
             const fieldName = await verifyField(page, {

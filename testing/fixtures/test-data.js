@@ -14,12 +14,13 @@
  *
  * Field reference:
  *   id            — Unique test ID: "{category}-{config}-{tz}" (e.g., "1-A-BRT")
- *   category      — Category number (1-13), determines which spec file runs this test
+ *   category      — Category number (1-15), determines which spec file runs this test
  *   categoryName  — Human-readable category name
  *   config        — Config letter (A-H), maps to FIELD_MAP in vv-config.js
  *   tz            — Playwright project name: "BRT", "IST", or "UTC0"
  *   tzOffset      — Expected GMT offset string in Date.toString() output
- *   action        — Test action type: "popup", "typed", "setFieldValue", "reload", etc.
+ *   action        — Test action type: "popup", "typed", "setFieldValue", "reload", "auditCapture",
+ *                   "umbrella", "skip", "theoretical", etc.
  *   inputDate     — Date to select/type: { year, month (1-indexed), day }
  *   inputDateStr  — Formatted date string for typed input tests (MM/dd/yyyy[ hh:mm AM])
  *   expectedRaw   — Expected raw stored value (getValueObjectValue)
@@ -29,6 +30,29 @@
  *   tcRef         — Path to the markdown TC spec in research/date-handling/
  *   savedRecord   — (Cat 3 only) Key into SAVED_RECORDS in vv-config.js (e.g., "cat3-A-BRT")
  *   saveTz        — (Cat 3 cross-TZ only) TZ the record was originally saved in (e.g., "BRT")
+ *
+ * Extended fields for non-standard entries (Cat 15 audits, umbrella/SKIP/PENDING):
+ *   captures      — (auditCapture only) Array of { key, expr, description } objects. Each entry
+ *                   evaluates `expr` in the page context and records the value as an audit
+ *                   annotation. No per-entry assertion — data-collection mode.
+ *   expectedPerEnv — (auditCapture only) Object keyed by env identifier (e.g., `v1`, `v2`,
+ *                    `emanueljofre-vvdemo`, `wadnr`) with the observed value for that env.
+ *                    Used for documentation and drift detection; the cat-15 spec records the
+ *                    active env and compares against the matching key if present.
+ *   umbrellaChildren — (umbrella action only) Array of child test IDs this entry aggregates
+ *                      (e.g., "11-save-BRT-load-IST" covers ["11-A-save-BRT-load-IST", ...]).
+ *                      Spec files skip umbrella entries at execution; they exist for matrix
+ *                      linkage and documentation.
+ *   skipReason    — (skip action only) Plain-English reason why this slot cannot be tested
+ *                   (e.g., "Brazil no longer observes DST"). Spec files skip these entries.
+ *   pendingReason — (theoretical action only) Reason why this slot is PENDING and what is
+ *                   needed to verify (e.g., "Requires direct DB query access").
+ *   scope         — Platform-scope suffix for the slot ID. Default (omitted) = "V1" (the
+ *                   matrix's default scope). Set to "V2" for entries whose ID carries the
+ *                   .V2 suffix. Spec files read this field and skip entries whose scope
+ *                   does not match the live `useUpdatedCalendarValueLogic` flag on the
+ *                   active environment, so V1 and V2 entries can coexist in the same
+ *                   category without cross-contaminating each other's runs.
  */
 
 const TEST_DATA = [
@@ -1700,6 +1724,20 @@ const TEST_DATA = [
         bugs: [],
         notes: 'Control: Config C round-trip at near-midnight is stable. Real UTC conversion (23:00 BRT = 02:00Z) → SFV parses Z back to same local. 0 drift. Proves FORM-BUG-5 is D-specific.',
         tcRef: 'research/date-handling/forms-calendar/test-cases/tc-12-config-C-near-midnight.md',
+    },
+    {
+        id: '12-dst-brazil',
+        category: 12,
+        categoryName: 'Edge Cases',
+        config: 'D',
+        tz: 'BRT',
+        tzOffset: 'GMT-0300',
+        action: 'skip',
+        bugs: [],
+        notes: 'SKIP — Brazil abolished DST in 2019 (Decreto Federal nº 9.772). America/Sao_Paulo has constant -03:00 year-round; no transition exists to exercise. DST jump mechanics are already covered by 12-dst-US-PST.',
+        skipReason:
+            'Brazil abolished DST in 2019. America/Sao_Paulo has no future transitions scheduled in tzdata; the slot is structurally unreachable.',
+        tcRef: 'research/date-handling/forms-calendar/test-cases/tc-12-dst-brazil.md',
     },
     // ═══════════════════════════════════════════════════════════════════════
     // Batch 2026-04-01 — Critical pending tests (12 entries)
@@ -4511,6 +4549,206 @@ const TEST_DATA = [
         notes: 'EXPECTED FAIL: Bug #5 +9h drift (JST). Largest positive offset tested. Fake Z midnight → UTC → JST 09:00. Completes TZ spectrum: BRT -3h, PDT -7h, UTC0 0h, IST +5:30h, JST +9h.',
         tcRef: 'research/date-handling/forms-calendar/test-cases/tc-11-load-Tokyo.md',
     },
+    {
+        id: '11-save-BRT-load-IST',
+        category: 11,
+        categoryName: 'Cross-Timezone',
+        tz: 'IST',
+        tzOffset: 'GMT+0530',
+        action: 'umbrella',
+        bugs: ['FORM-BUG-5'],
+        notes: 'Umbrella slot — aggregates the eight per-config BRT→IST cross-TZ reload tests (11-{A..H}-save-BRT-load-IST). Raw value preserved on every config; only Config D GFV carries fake .000Z (FORM-BUG-5). Execution happens in the child TCs.',
+        umbrellaChildren: [
+            '11-A-save-BRT-load-IST',
+            '11-B-save-BRT-load-IST',
+            '11-C-save-BRT-load-IST',
+            '11-D-save-BRT-load-IST',
+            '11-E-save-BRT-load-IST',
+            '11-F-save-BRT-load-IST',
+            '11-G-save-BRT-load-IST',
+            '11-H-save-BRT-load-IST',
+        ],
+        tcRef: 'research/date-handling/forms-calendar/test-cases/tc-11-save-BRT-load-IST.md',
+    },
+    {
+        id: '11-report-cross',
+        category: 11,
+        categoryName: 'Cross-Timezone',
+        tz: 'BRT',
+        tzOffset: 'GMT-0300',
+        action: 'theoretical',
+        bugs: ['FORM-BUG-7', 'FORM-BUG-5'],
+        notes: 'PENDING — theoretical based on results.md § Test 2.4 and confirmed at per-record layer by 13-query-consistency / 13-cross-tz-save. Report queries across TZ-heterogeneous datasets miss records whose storage was shifted by FORM-BUG-7 on save. Needs dedicated report/SQL surface run before status can move off PENDING.',
+        pendingReason:
+            'Requires dedicated report query surface (VV custom query / Reports engine / direct SQL) and a 3-record multi-TZ dataset. Evidence at the per-record layer already exists in 13-query-consistency; this slot formalizes the report-layer reproduction.',
+        tcRef: 'research/date-handling/forms-calendar/test-cases/tc-11-report-cross.md',
+    },
+
+    // ─── Category 11 — .V2 scope entries (EmanuelJofre-vv5dev) ──────────────────
+    // V2 is the default code path on EmanuelJofre-vv5dev (DB-scope "Use Updated
+    // Calendar Control Logic" = ON). Live SFV-in-IST captures 2026-04-20 show
+    // systemic V2 divergence from V1: every config stores raw as ISO-with-Z
+    // ("YYYY-MM-DDTHH:mm:ss.000Z"), and api === raw (V2 collapses the V1
+    // GetFieldValue transformation). Config A/E (date-only, TZ-aware) carry
+    // the FORM-BUG-7 day shift (IST midnight → "2026-03-14T18:30:00.000Z").
+    // ignoreTimezone=true (B/D/F/H) still prevents the day shift — it is the
+    // primary FORM-BUG-7 mitigation on V2 as well as V1. Spec mechanics caveat:
+    // cat-11-cross-timezone.spec.js does not load the saved record — it SFVs on
+    // a fresh template — so these measure V2 SFV-in-IST, not load-of-BRT-save.
+    // Live evidence: projects/emanueljofre-vv5dev/testing/date-handling/
+    //   forms-calendar/runs/cat11-save-BRT-load-IST-vv5dev-2026-04-20.md
+    {
+        id: '11-A-save-BRT-load-IST.V2',
+        category: 11,
+        categoryName: 'Cross-Timezone',
+        config: 'A',
+        tz: 'IST',
+        tzOffset: 'GMT+0530',
+        scope: 'V2',
+        action: 'reload',
+        inputDate: { year: 2026, month: 3, day: 15 },
+        inputDateStr: '03/15/2026',
+        expectedRaw: '2026-03-14T18:30:00.000Z',
+        expectedApi: '2026-03-14T18:30:00.000Z',
+        savedRecord: 'cat3-A-BRT',
+        saveTz: 'BRT',
+        bugs: ['FORM-BUG-7'],
+        notes: 'V2 Config A in IST: date-only SFV is normalized to ISO-with-Z and shifted to UTC (IST midnight → "2026-03-14T18:30:00.000Z"). FORM-BUG-7 still fires, now stored with full UTC datetime shape. api === raw under V2.',
+        tcRef: 'research/date-handling/forms-calendar/test-cases/tc-11-A-save-BRT-load-IST.md',
+    },
+    {
+        id: '11-B-save-BRT-load-IST.V2',
+        category: 11,
+        categoryName: 'Cross-Timezone',
+        config: 'B',
+        tz: 'IST',
+        tzOffset: 'GMT+0530',
+        scope: 'V2',
+        action: 'reload',
+        inputDate: { year: 2026, month: 3, day: 15 },
+        inputDateStr: '03/15/2026',
+        expectedRaw: '2026-03-15T00:00:00.000Z',
+        expectedApi: '2026-03-15T00:00:00.000Z',
+        savedRecord: 'cat3-B-BRT',
+        saveTz: 'BRT',
+        bugs: [],
+        notes: 'V2 Config B in IST: ignoreTimezone=true preserves day (no FORM-BUG-7). V2 normalizes raw to "2026-03-15T00:00:00.000Z" (was naive "2026-03-15" under V1 date-only). api === raw.',
+        tcRef: 'research/date-handling/forms-calendar/test-cases/tc-11-B-save-BRT-load-IST.md',
+    },
+    {
+        id: '11-C-save-BRT-load-IST.V2',
+        category: 11,
+        categoryName: 'Cross-Timezone',
+        config: 'C',
+        tz: 'IST',
+        tzOffset: 'GMT+0530',
+        scope: 'V2',
+        action: 'reload',
+        inputDate: { year: 2026, month: 3, day: 15 },
+        inputDateStr: '03/15/2026 12:00 AM',
+        expectedRaw: '2026-03-15T00:00:00.000Z',
+        expectedApi: '2026-03-15T00:00:00.000Z',
+        savedRecord: 'cat3-C-BRT',
+        saveTz: 'BRT',
+        bugs: [],
+        notes: 'V2 Config C in IST: raw carries .000Z suffix (was naive "2026-03-15T00:00:00" under V1). api === raw under V2 — the V1 GFV transformation that returned a different api value is gone.',
+        tcRef: 'research/date-handling/forms-calendar/test-cases/tc-11-C-save-BRT-load-IST.md',
+    },
+    {
+        id: '11-D-save-BRT-load-IST.V2',
+        category: 11,
+        categoryName: 'Cross-Timezone',
+        config: 'D',
+        tz: 'IST',
+        tzOffset: 'GMT+0530',
+        scope: 'V2',
+        action: 'reload',
+        inputDate: { year: 2026, month: 3, day: 15 },
+        inputDateStr: '03/15/2026 12:00 AM',
+        expectedRaw: '2026-03-15T00:00:00.000Z',
+        expectedApi: '2026-03-15T00:00:00.000Z',
+        savedRecord: 'cat3-A-BRT',
+        saveTz: 'BRT',
+        bugs: ['FORM-BUG-5'],
+        notes: 'V2 Config D in IST: raw now persists with .000Z suffix (matches the Cat 15 sfv-widget finding). FORM-BUG-5 "fake Z" on api is moot because V1 GFV transformation is unified with raw under V2 — api === raw. Day preserved via ignoreTimezone.',
+        tcRef: 'research/date-handling/forms-calendar/test-cases/tc-11-D-save-BRT-load-IST.md',
+    },
+    {
+        id: '11-E-save-BRT-load-IST.V2',
+        category: 11,
+        categoryName: 'Cross-Timezone',
+        config: 'E',
+        tz: 'IST',
+        tzOffset: 'GMT+0530',
+        scope: 'V2',
+        action: 'reload',
+        inputDate: { year: 2026, month: 3, day: 15 },
+        inputDateStr: '03/15/2026',
+        expectedRaw: '2026-03-14T18:30:00.000Z',
+        expectedApi: '2026-03-14T18:30:00.000Z',
+        savedRecord: 'cat3-EF-BRT',
+        saveTz: 'BRT',
+        bugs: ['FORM-BUG-7'],
+        notes: 'V2 Config E in IST: legacy immunity to FORM-BUG-7 is GONE. Legacy date-only fields now behave identically to Config A — IST midnight stored as UTC ("2026-03-14T18:30:00.000Z"). V1 baseline had naive "2026-03-15" preserved; V2 does not.',
+        tcRef: 'research/date-handling/forms-calendar/test-cases/tc-11-E-save-BRT-load-IST.md',
+    },
+    {
+        id: '11-F-save-BRT-load-IST.V2',
+        category: 11,
+        categoryName: 'Cross-Timezone',
+        config: 'F',
+        tz: 'IST',
+        tzOffset: 'GMT+0530',
+        scope: 'V2',
+        action: 'reload',
+        inputDate: { year: 2026, month: 3, day: 15 },
+        inputDateStr: '03/15/2026',
+        expectedRaw: '2026-03-15T00:00:00.000Z',
+        expectedApi: '2026-03-15T00:00:00.000Z',
+        savedRecord: 'cat3-EF-BRT',
+        saveTz: 'BRT',
+        bugs: [],
+        notes: 'V2 Config F in IST: legacy + ignoreTimezone. Behaves identically to Config B under V2 (raw = "2026-03-15T00:00:00.000Z", day preserved). Legacy vs non-legacy distinction is collapsed by V2 storage normalization.',
+        tcRef: 'research/date-handling/forms-calendar/test-cases/tc-11-F-save-BRT-load-IST.md',
+    },
+    {
+        id: '11-G-save-BRT-load-IST.V2',
+        category: 11,
+        categoryName: 'Cross-Timezone',
+        config: 'G',
+        tz: 'IST',
+        tzOffset: 'GMT+0530',
+        scope: 'V2',
+        action: 'reload',
+        inputDate: { year: 2026, month: 3, day: 15 },
+        inputDateStr: '03/15/2026 12:00 AM',
+        expectedRaw: '2026-03-15T00:00:00.000Z',
+        expectedApi: '2026-03-15T00:00:00.000Z',
+        savedRecord: 'cat3-G-BRT',
+        saveTz: 'BRT',
+        bugs: [],
+        notes: 'V2 Config G in IST: legacy DateTime. Behaves identically to Config C under V2 (raw = "2026-03-15T00:00:00.000Z", api === raw). V1 baseline had naive "2026-03-15T00:00:00" with no transformation; V2 always appends .000Z.',
+        tcRef: 'research/date-handling/forms-calendar/test-cases/tc-11-G-save-BRT-load-IST.md',
+    },
+    {
+        id: '11-H-save-BRT-load-IST.V2',
+        category: 11,
+        categoryName: 'Cross-Timezone',
+        config: 'H',
+        tz: 'IST',
+        tzOffset: 'GMT+0530',
+        scope: 'V2',
+        action: 'reload',
+        inputDate: { year: 2026, month: 3, day: 15 },
+        inputDateStr: '03/15/2026 12:00 AM',
+        expectedRaw: '2026-03-15T00:00:00.000Z',
+        expectedApi: '2026-03-15T00:00:00.000Z',
+        savedRecord: 'cat3-H-BRT',
+        saveTz: 'BRT',
+        bugs: [],
+        notes: 'V2 Config H in IST: legacy DateTime + ignoreTimezone. Behaves identically to Config D under V2 — storage normalized to .000Z-suffixed ISO. Legacy immunity to FORM-BUG-5 (preserved raw under V1) is moot because V2 api === raw for all configs.',
+        tcRef: 'research/date-handling/forms-calendar/test-cases/tc-11-H-save-BRT-load-IST.md',
+    },
 
     // ═══════════════════════════════════════════════════════════════════════════
     // Category 14 — Mask Impact
@@ -4845,9 +5083,18 @@ const TEST_DATA = [
     },
     // ═══════════════════════════════════════════════════════════════════════
     // Category 10 — Web Service Input
-    // REST API writes a date value via postForms, then Forms loads the record.
-    // Tests the cross-layer path: API storage → Forms V1 interpretation.
-    // CB-8 = API normalizes to Z → Forms V1 interprets Z as UTC → local shift.
+    //
+    // REST API writes a date value via postForms; the spec then opens the record
+    // in the browser to capture Forms V1 interpretation. Tests the cross-layer
+    // path: API storage → Forms V1 load → rawValue/GetFieldValue/display.
+    // CB-8 = API normalizes to Z → Forms V1 treats Z as real UTC → local shift.
+    //
+    // Action: 'wsApiCreateAndLoad' — handled by cat-10-ws-input.spec.js.
+    //
+    // expectedRaw / expectedApi / expectedDisplay are OBSERVED values from
+    // ws-4-batch-run-1.md and cat10-gaps-run-1.md (2026-04-02) — regression
+    // asserts current buggy behavior to detect future drift. When bugs are
+    // fixed, expected values must be updated.
     // ═══════════════════════════════════════════════════════════════════════
     {
         id: '10-D-ws-isoZ',
@@ -4856,14 +5103,15 @@ const TEST_DATA = [
         config: 'D',
         tz: 'BRT',
         tzOffset: 'GMT-0300',
-        action: 'ws-api-create',
-        inputDate: { year: 2026, month: 3, day: 15 },
+        action: 'wsApiCreateAndLoad',
         inputDateStr: '2026-03-15T00:00:00.000Z',
-        expectedRaw: '2026-03-15T00:00:00',
-        expectedApi: '2026-03-15T00:00:00',
+        expectedApiStored: '2026-03-15T00:00:00Z',
+        expectedRaw: '2026-03-14T21:00:00',
+        expectedApi: '2026-03-14T21:00:00.000Z',
+        expectedDisplay: '03/15/2026 12:00 AM',
         bugs: ['WS-BUG-1', 'FORM-BUG-5'],
-        notes: 'EXPECTED FAIL: CB-8 cross-layer shift. API stores T00:00:00Z, Forms V1 shifts -3h to T21:00:00 (Mar 14). Bug #5 adds fake Z to GFV. Date crosses from Mar 15 to Mar 14.',
-        tcRef: 'research/date-handling/forms-calendar/test-cases/tc-10-D-ws-isoZ.md',
+        notes: 'CB-8 cross-layer shift. API stores T00:00:00Z; Forms V1 with ignoreTZ loads leaving rawValue -3h (Mar 14 21:00). Bug #5 adds fake Z to GFV. Display preserves original 12:00 AM via ignoreTZ.',
+        tcRef: null,
     },
     {
         id: '10-D-ws-isoNoZ',
@@ -4872,14 +5120,15 @@ const TEST_DATA = [
         config: 'D',
         tz: 'BRT',
         tzOffset: 'GMT-0300',
-        action: 'ws-api-create',
-        inputDate: { year: 2026, month: 3, day: 15 },
+        action: 'wsApiCreateAndLoad',
         inputDateStr: '2026-03-15T00:00:00',
-        expectedRaw: '2026-03-15T00:00:00',
-        expectedApi: '2026-03-15T00:00:00',
+        expectedApiStored: '2026-03-15T00:00:00Z',
+        expectedRaw: '2026-03-14T21:00:00',
+        expectedApi: '2026-03-14T21:00:00.000Z',
+        expectedDisplay: '03/15/2026 12:00 AM',
         bugs: ['WS-BUG-1', 'FORM-BUG-5'],
-        notes: 'EXPECTED FAIL: API adds Z to no-Z input → identical to isoZ. Same CB-8 shift -3h, same date crossing.',
-        tcRef: 'research/date-handling/forms-calendar/test-cases/tc-10-D-ws-isoNoZ.md',
+        notes: 'API appends Z to no-Z input → identical downstream behavior to isoZ. Same CB-8 shift -3h, same date crossing from Mar 15 to Mar 14 in rawValue.',
+        tcRef: null,
     },
     {
         id: '10-D-ws-dateOnly',
@@ -4888,14 +5137,15 @@ const TEST_DATA = [
         config: 'D',
         tz: 'BRT',
         tzOffset: 'GMT-0300',
-        action: 'ws-api-create',
-        inputDate: { year: 2026, month: 3, day: 15 },
+        action: 'wsApiCreateAndLoad',
         inputDateStr: '2026-03-15',
-        expectedRaw: '2026-03-15T00:00:00',
-        expectedApi: '2026-03-15T00:00:00',
+        expectedApiStored: '2026-03-15T00:00:00Z',
+        expectedRaw: '2026-03-14T21:00:00',
+        expectedApi: '2026-03-14T21:00:00.000Z',
+        expectedDisplay: '03/15/2026 12:00 AM',
         bugs: ['WS-BUG-1', 'FORM-BUG-5'],
-        notes: 'EXPECTED FAIL: Date-only input normalized to T00:00:00Z by API → CB-8 shift. Config D enableTime=true keeps shifted time. Config A (date-only field) would strip time and pass.',
-        tcRef: 'research/date-handling/forms-calendar/test-cases/tc-10-D-ws-dateOnly.md',
+        notes: 'Date-only input normalized to T00:00:00Z by API → same CB-8 shift. Config D enableTime=true keeps the shifted time. Contrast with Config A date-only field (10-A-ws-dateOnly) which passes.',
+        tcRef: null,
     },
     {
         id: '10-D-ws-dotnet',
@@ -4904,14 +5154,15 @@ const TEST_DATA = [
         config: 'D',
         tz: 'BRT',
         tzOffset: 'GMT-0300',
-        action: 'ws-api-create',
-        inputDate: { year: 2026, month: 3, day: 15 },
+        action: 'wsApiCreateAndLoad',
         inputDateStr: '2026-03-15T00:00:00.000+00:00',
-        expectedRaw: '2026-03-15T00:00:00',
-        expectedApi: '2026-03-15T00:00:00',
+        expectedApiStored: '2026-03-15T00:00:00Z',
+        expectedRaw: '2026-03-14T21:00:00',
+        expectedApi: '2026-03-14T21:00:00.000Z',
+        expectedDisplay: '03/15/2026 12:00 AM',
         bugs: ['WS-BUG-1', 'FORM-BUG-5'],
-        notes: 'EXPECTED FAIL: .NET +00:00 offset = Z equivalent. Stored as T00:00:00Z, same CB-8 shift as isoZ.',
-        tcRef: 'research/date-handling/forms-calendar/test-cases/tc-10-D-ws-dotnet.md',
+        notes: '.NET +00:00 offset = Z equivalent. API converts to T00:00:00Z (CB-12), same CB-8 shift as isoZ.',
+        tcRef: null,
     },
     {
         id: '10-D-ws-epoch',
@@ -4920,14 +5171,15 @@ const TEST_DATA = [
         config: 'D',
         tz: 'BRT',
         tzOffset: 'GMT-0300',
-        action: 'ws-api-create',
-        inputDate: { year: 2026, month: 3, day: 15 },
+        action: 'wsApiCreateAndLoad',
         inputDateStr: '1773532800000',
-        expectedRaw: '2026-03-15T00:00:00',
-        expectedApi: '2026-03-15T00:00:00',
-        bugs: ['WS-BUG-5'],
-        notes: 'EXPECTED FAIL: Epoch ms silently stored as null. API accepts the value without error but stores empty. WS-BUG-5 variant — numeric format not parsed.',
-        tcRef: 'research/date-handling/forms-calendar/test-cases/tc-10-D-ws-epoch.md',
+        expectedApiStored: '',
+        expectedRaw: '',
+        expectedApi: 'Invalid Date',
+        expectedDisplay: '',
+        bugs: ['WS-BUG-5', 'FORM-BUG-6'],
+        notes: 'Epoch ms silently stored as null by API (WS-BUG-5 variant). Forms loads empty; GetFieldValue returns "Invalid Date" string (FORM-BUG-6). Display is empty.',
+        tcRef: null,
     },
     {
         id: '10-D-ws-midnight-cross',
@@ -4936,14 +5188,488 @@ const TEST_DATA = [
         config: 'D',
         tz: 'BRT',
         tzOffset: 'GMT-0300',
-        action: 'ws-api-create',
-        inputDate: { year: 2026, month: 3, day: 15 },
+        action: 'wsApiCreateAndLoad',
         inputDateStr: '2026-03-15T02:00:00',
-        expectedRaw: '2026-03-15T02:00:00',
-        expectedApi: '2026-03-15T02:00:00',
+        expectedApiStored: '2026-03-15T02:00:00Z',
+        expectedRaw: '2026-03-14T23:00:00',
+        expectedApi: '2026-03-14T23:00:00.000Z',
+        expectedDisplay: '03/15/2026 02:00 AM',
         bugs: ['WS-BUG-1', 'FORM-BUG-5'],
-        notes: 'EXPECTED FAIL: Near-midnight crossing. T02:00:00Z -3h = T23:00:00 (Mar 14). Critical for CSV imports with timestamps < TZ offset from midnight. Date crosses to previous day.',
-        tcRef: 'research/date-handling/forms-calendar/test-cases/tc-10-D-ws-midnight-cross.md',
+        notes: 'Near-midnight crossing. T02:00:00Z -3h = T23:00:00 (Mar 14). Critical for CSV imports with timestamps < TZ offset from midnight — display looks correct but rawValue stores the previous day.',
+        tcRef: null,
+    },
+    {
+        id: '10-A-ws-isoZ',
+        category: 10,
+        categoryName: 'Web Service Input',
+        config: 'A',
+        tz: 'BRT',
+        tzOffset: 'GMT-0300',
+        action: 'wsApiCreateAndLoad',
+        inputDateStr: '2026-03-15T00:00:00.000Z',
+        expectedApiStored: '2026-03-15T00:00:00Z',
+        expectedRaw: '2026-03-15',
+        expectedApi: '2026-03-15',
+        expectedDisplay: '03/15/2026',
+        bugs: [],
+        notes: 'Date-only Config A passes — Forms V1 strips the time component on load, rawValue = "2026-03-15". Bug #7 does NOT fire on load path (only save path).',
+        tcRef: null,
+    },
+    {
+        id: '10-A-ws-dateOnly',
+        category: 10,
+        categoryName: 'Web Service Input',
+        config: 'A',
+        tz: 'BRT',
+        tzOffset: 'GMT-0300',
+        action: 'wsApiCreateAndLoad',
+        inputDateStr: '2026-03-15',
+        expectedApiStored: '2026-03-15T00:00:00Z',
+        expectedRaw: '2026-03-15',
+        expectedApi: '2026-03-15',
+        expectedDisplay: '03/15/2026',
+        bugs: [],
+        notes: 'Date-only input to date-only field — passes cleanly. API normalizes to T00:00:00Z; Forms strips time component on load.',
+        tcRef: null,
+    },
+    {
+        id: '10-C-ws-isoZ',
+        category: 10,
+        categoryName: 'Web Service Input',
+        config: 'C',
+        tz: 'BRT',
+        tzOffset: 'GMT-0300',
+        action: 'wsApiCreateAndLoad',
+        inputDateStr: '2026-03-15T00:00:00.000Z',
+        expectedApiStored: '2026-03-15T00:00:00Z',
+        expectedRaw: '2026-03-14T21:00:00',
+        expectedApi: '2026-03-15T00:00:00.000Z',
+        expectedDisplay: '03/14/2026 09:00 PM',
+        bugs: ['WS-BUG-1'],
+        notes: 'Config C (ignoreTZ=false): Forms V1 interprets Z as real UTC and converts for display AND rawValue. BRT: 00:00 UTC → 21:00 Mar 14 local. GetFieldValue preserves original UTC — inconsistent with rawValue (cross-layer shift, no Bug #5 since ignoreTZ=false).',
+        tcRef: null,
+    },
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Category 15 — Kendo Widget Comparison (audit captures)
+    //
+    // Data-collection audit slots. Each entry names a capture function registered
+    // in cat-15-audit.spec.js (CAPTURE_FNS map) and records observed values in
+    // expectedPerEnv. No per-entry assertion on specific values — the captures
+    // are the evidence.
+    //
+    // expectedPerEnv values in this section are sourced exclusively from a live
+    // EmanuelJofre-vv5dev run (2026-04-20, BRT-chromium). Other envs can be
+    // added here after they are re-verified live.
+    // ═══════════════════════════════════════════════════════════════════════════
+    {
+        id: '15-vv-core',
+        category: 15,
+        categoryName: 'Kendo Widget Comparison',
+        tz: 'BRT',
+        tzOffset: 'GMT-0300',
+        action: 'auditCapture',
+        captureFn: 'vvCore',
+        captureArgs: {},
+        bugs: [],
+        notes: 'VV.Form core properties audit, captured live on EmanuelJofre-vv5dev (2026-04-20, BRT). V2 code path is active (useUpdatedCalendarValueLogic=true) — the new sandbox is the first environment in this matrix where V2 is the default. 4 calendarValueService methods, no LocalizationResources, 26 VV.Form properties, formId undefined.',
+        expectedPerEnv: {
+            'EmanuelJofre-vv5dev': {
+                formIdType: 'undefined',
+                useUpdatedCalendarValueLogic: true,
+                calendarValueServiceMethods: [
+                    'formatDateStringForDisplay',
+                    'getCalendarFieldValue',
+                    'getSaveValue',
+                    'parseDateString',
+                ],
+                hasLocalizationResources: false,
+                localizationResourcesType: 'undefined',
+                localizationResourcesKeys: null,
+                vvFormPropertyCount: 26,
+            },
+        },
+        tcRef: 'research/date-handling/forms-calendar/test-cases/tc-15-vv-core.md',
+    },
+    {
+        id: '15-fieldMaster-C',
+        category: 15,
+        categoryName: 'Kendo Widget Comparison',
+        config: 'C',
+        tz: 'BRT',
+        tzOffset: 'GMT-0300',
+        action: 'auditCapture',
+        captureFn: 'fieldMasterByConfig',
+        captureArgs: { configKey: 'C' },
+        bugs: [],
+        notes: 'fieldMaster entry for Config C (enableTime=true, ignoreTZ=false), captured live on EmanuelJofre-vv5dev (2026-04-20). Semantic field name "dateTimeUtcV2Empty" (Date Test Harness form). mask/placeholder empty, format/displayFormat absent, fieldType=13, formVersion=3, enableQListener=false.',
+        expectedPerEnv: {
+            'EmanuelJofre-vv5dev': {
+                name: 'dateTimeUtcV2Empty',
+                mask: '',
+                placeholder: '',
+                enableTime: true,
+                ignoreTimezone: false,
+                useLegacy: false,
+                fieldType: 13,
+                formVersion: 3,
+                enableQListener: false,
+                renderAsReadOnly: false,
+                initialValueMode: 0,
+                enableInitialValue: false,
+            },
+        },
+        tcRef: 'research/date-handling/forms-calendar/test-cases/tc-15-fieldMaster-C.md',
+    },
+    {
+        id: '15-fieldMaster-D',
+        category: 15,
+        categoryName: 'Kendo Widget Comparison',
+        config: 'D',
+        tz: 'BRT',
+        tzOffset: 'GMT-0300',
+        action: 'auditCapture',
+        captureFn: 'fieldMasterByConfig',
+        captureArgs: { configKey: 'D' },
+        bugs: [],
+        notes: 'fieldMaster entry for Config D (enableTime=true, ignoreTZ=true), captured live on EmanuelJofre-vv5dev (2026-04-20). Semantic field name "dateTimeLocalV2Empty". Same shape as Config C except ignoreTimezone=true. Primary FORM-BUG-5 surface, but the fieldMaster itself carries no V2-specific divergence.',
+        expectedPerEnv: {
+            'EmanuelJofre-vv5dev': {
+                name: 'dateTimeLocalV2Empty',
+                mask: '',
+                placeholder: '',
+                enableTime: true,
+                ignoreTimezone: true,
+                useLegacy: false,
+                fieldType: 13,
+                formVersion: 3,
+                enableQListener: false,
+                renderAsReadOnly: false,
+                initialValueMode: 0,
+                enableInitialValue: false,
+            },
+        },
+        tcRef: 'research/date-handling/forms-calendar/test-cases/tc-15-fieldMaster-D.md',
+    },
+    {
+        id: '15-kendo-global',
+        category: 15,
+        categoryName: 'Kendo Widget Comparison',
+        tz: 'BRT',
+        tzOffset: 'GMT-0300',
+        action: 'auditCapture',
+        captureFn: 'kendoGlobal',
+        captureArgs: {},
+        bugs: [],
+        notes: 'Global `kendo` object audit, captured live on EmanuelJofre-vv5dev (2026-04-20). `kendo` is NOT defined — Angular module system only, no global exposure. Consistent with the earlier vvdemo/WADNR observations.',
+        expectedPerEnv: {
+            'EmanuelJofre-vv5dev': {
+                kendoDefined: false,
+                kendoVersion: null,
+                hasCulture: false,
+                cultureName: null,
+                cultureCalendarPatterns: null,
+            },
+        },
+        tcRef: 'research/date-handling/forms-calendar/test-cases/tc-15-kendo-global.md',
+    },
+    {
+        id: '15-widget-opts-A',
+        category: 15,
+        categoryName: 'Kendo Widget Comparison',
+        config: 'A',
+        tz: 'BRT',
+        tzOffset: 'GMT-0300',
+        action: 'auditCapture',
+        captureFn: 'widgetOptsByConfig',
+        captureArgs: { configKey: 'A' },
+        bugs: [],
+        notes: 'Kendo DatePicker options for Config A (date-only), captured live on EmanuelJofre-vv5dev (2026-04-20). `[name="dateTzAwareV2Empty"]` does not match — VV calendar inputs lack name attributes under V2 as well. Widget inspection blocked; the block itself is the observation.',
+        expectedPerEnv: {
+            'EmanuelJofre-vv5dev': { error: 'input not found', fieldName: 'dateTzAwareV2Empty' },
+        },
+        tcRef: 'research/date-handling/forms-calendar/test-cases/tc-15-widget-opts-A.md',
+    },
+    {
+        id: '15-widget-opts-D',
+        category: 15,
+        categoryName: 'Kendo Widget Comparison',
+        config: 'D',
+        tz: 'BRT',
+        tzOffset: 'GMT-0300',
+        action: 'auditCapture',
+        captureFn: 'widgetOptsByConfig',
+        captureArgs: { configKey: 'D' },
+        bugs: [],
+        notes: 'Kendo DateTimePicker options for Config D (DateTime+iTZ), captured live on EmanuelJofre-vv5dev (2026-04-20). `[name="dateTimeLocalV2Empty"]` does not match. Same block pattern as 15-widget-opts-A; DOM selector unavailable under V2.',
+        expectedPerEnv: {
+            'EmanuelJofre-vv5dev': { error: 'input not found', fieldName: 'dateTimeLocalV2Empty' },
+        },
+        tcRef: 'research/date-handling/forms-calendar/test-cases/tc-15-widget-opts-D.md',
+    },
+    {
+        id: '15-sfv-widget',
+        category: 15,
+        categoryName: 'Kendo Widget Comparison',
+        config: 'D',
+        tz: 'BRT',
+        tzOffset: 'GMT-0300',
+        action: 'auditCapture',
+        captureFn: 'sfvWidget',
+        captureArgs: { configKey: 'D', value: '2026-03-15T14:30:00' },
+        bugs: ['FORM-BUG-5'],
+        notes: 'SetFieldValue(Config D, "2026-03-15T14:30:00") then capture VV raw/api and Kendo widget .value(), live on EmanuelJofre-vv5dev (2026-04-20, BRT). V2 DIVERGENCE: vvRaw carries ".000Z" ("2026-03-15T14:30:00.000Z") instead of the naive V1 value "2026-03-15T14:30:00" observed earlier on vvdemo/WADNR. vvApi is identical in both ("...000Z"). Widget-level access blocked (input not found) — same as earlier envs. This is the first Cat 15 slot with a measurable V1→V2 storage difference.',
+        expectedPerEnv: {
+            'EmanuelJofre-vv5dev': {
+                vvRaw: '2026-03-15T14:30:00.000Z',
+                vvApi: '2026-03-15T14:30:00.000Z',
+                widgetValue: null,
+                displayValue: null,
+            },
+        },
+        tcRef: 'research/date-handling/forms-calendar/test-cases/tc-15-sfv-widget.md',
+    },
+    {
+        id: '15-mask-scan',
+        category: 15,
+        categoryName: 'Kendo Widget Comparison',
+        tz: 'BRT',
+        tzOffset: 'GMT-0300',
+        action: 'auditCapture',
+        captureFn: 'maskScan',
+        captureArgs: {},
+        bugs: [],
+        notes: 'Scan all calendar fields for mask-related properties, live on EmanuelJofre-vv5dev (2026-04-20). 24 calendar fields on the Date Test Harness form (different template from DateTest on vvdemo which has 26). Every field: mask=null, placeholder=null, no format/displayFormat. Clean V2 baseline — masks are absent across all 24 fields.',
+        expectedPerEnv: {
+            'EmanuelJofre-vv5dev': { totalCalendarFields: 24, fieldsWithMask: 0 },
+        },
+        tcRef: 'research/date-handling/forms-calendar/test-cases/tc-15-mask-scan.md',
+    },
+    // ═══════════════════════════════════════════════════════════════════════
+    // Category 13 — DB Storage via REST API
+    //
+    // Verifies what VV actually stores in the database for date fields across
+    // different write paths (API postForms vs browser save vs round-trip drift
+    // persisted to DB). Reads back via getForms and asserts server-returned
+    // values field-by-field. Creates FRESH records per run — never asserts on
+    // pre-existing fixture records.
+    //
+    // Action shapes:
+    //   apiWriteRead
+    //     apiInput: { <config>: value, ... }          field values sent in POST
+    //     apiAssertions: { <config>: expectedApi, ... } per-field GET assertions
+    //   saveAndApiRead
+    //     browserInputs: [{ config, value, variant? }, ...] SFV inputs
+    //     apiAssertions: [{ config, variant?, expected }, ...]
+    //   roundtripSaveAndApiRead
+    //     config, sfvInput, roundTrips, expectedApi
+    //   querySameLogicalDate
+    //     browserInputs, altTz: {name, timezoneId}, queryConfig, queryDate
+    //
+    // Expected values are V1-baselined (vvdemo/WADNR run V1). Spec skips on V2.
+    // ═══════════════════════════════════════════════════════════════════════
+    {
+        id: '13-ws-input',
+        category: 13,
+        categoryName: 'DB Storage via API',
+        config: '—',
+        tz: 'BRT',
+        tzOffset: 'GMT-0300',
+        action: 'apiWriteRead',
+        apiInput: { A: '2026-03-15', B: '2026-03-15', C: '2026-03-15', D: '2026-03-15' },
+        apiAssertions: {
+            A: '2026-03-15T00:00:00Z',
+            B: '2026-03-15T00:00:00Z',
+            C: '2026-03-15T00:00:00Z',
+            D: '2026-03-15T00:00:00Z',
+        },
+        bugs: [],
+        notes: 'API write path (postForms) stores all 4 configs uniformly — no C/D divergence, no FORM-BUG-7. Mixed storage is a Forms pipeline issue, not an API path issue.',
+        tcRef: 'research/date-handling/forms-calendar/test-cases/tc-13-ws-input.md',
+    },
+    {
+        id: '13-B-storage',
+        category: 13,
+        categoryName: 'DB Storage via API',
+        config: '—',
+        tz: 'BRT',
+        tzOffset: 'GMT-0300',
+        action: 'apiWriteRead',
+        apiInput: { A: '2026-03-15', B: '2026-03-15' },
+        apiAssertions: { A: '2026-03-15T00:00:00Z', B: '2026-03-15T00:00:00Z' },
+        bugs: [],
+        notes: 'ignoreTimezone has no effect on date-only storage via API; A = B byte-identical.',
+        tcRef: 'research/date-handling/forms-calendar/test-cases/tc-13-B-storage.md',
+    },
+    {
+        id: '13-C-vs-D-storage',
+        category: 13,
+        categoryName: 'DB Storage via API',
+        config: '—',
+        tz: 'BRT',
+        tzOffset: 'GMT-0300',
+        action: 'apiWriteRead',
+        apiInput: { C: '2026-03-15', D: '2026-03-15' },
+        apiAssertions: { C: '2026-03-15T00:00:00Z', D: '2026-03-15T00:00:00Z' },
+        bugs: [],
+        notes: 'API path uniform across C and D (bypasses Forms getSaveValue). C vs D divergence only appears on browser-saved records.',
+        tcRef: 'research/date-handling/forms-calendar/test-cases/tc-13-C-vs-D-storage.md',
+    },
+    {
+        id: '13-initial-values-BRT',
+        category: 13,
+        categoryName: 'DB Storage via API',
+        config: 'A',
+        tz: 'BRT',
+        tzOffset: 'GMT-0300',
+        action: 'saveAndApiRead',
+        browserInputs: [],
+        apiAssertions: [{ config: 'A', variant: 'preset', expected: '2026-03-01T03:00:00Z' }],
+        bugs: [],
+        notes: 'Preset field Config A (March 1) stores UTC via getSaveValue→toISOString. BRT midnight March 1 = 03:00 UTC; API read returns that with appended Z.',
+        tcRef: 'research/date-handling/forms-calendar/test-cases/tc-13-initial-values.md',
+    },
+    {
+        id: '13-user-input-BRT',
+        category: 13,
+        categoryName: 'DB Storage via API',
+        config: 'A',
+        tz: 'BRT',
+        tzOffset: 'GMT-0300',
+        action: 'saveAndApiRead',
+        browserInputs: [
+            { config: 'A', value: '2026-03-15' },
+            { config: 'C', value: '2026-03-15T00:00:00' },
+            { config: 'D', value: '2026-03-15T00:00:00' },
+        ],
+        apiAssertions: [
+            { config: 'A', expected: '2026-03-15T00:00:00Z' },
+            { config: 'C', expected: '2026-03-15T00:00:00Z' },
+            { config: 'D', expected: '2026-03-15T00:00:00Z' },
+        ],
+        bugs: [],
+        notes: 'User-input fields store local time via getSaveValue. In BRT local midnight = stored value. Contrast with preset fields (13-initial-values-BRT) which store UTC.',
+        tcRef: 'research/date-handling/forms-calendar/test-cases/tc-13-user-input.md',
+    },
+    {
+        id: '13-cross-tz-save-BRT',
+        category: 13,
+        categoryName: 'DB Storage via API',
+        config: 'A',
+        tz: 'BRT',
+        tzOffset: 'GMT-0300',
+        action: 'saveAndApiRead',
+        browserInputs: [
+            { config: 'A', value: '2026-03-15' },
+            { config: 'D', value: '2026-03-15T00:00:00' },
+        ],
+        apiAssertions: [
+            { config: 'A', expected: '2026-03-15T00:00:00Z' },
+            { config: 'D', expected: '2026-03-15T00:00:00Z' },
+        ],
+        bugs: [],
+        notes: 'BRT baseline for the cross-TZ comparison. Config A stores March 15 correctly in BRT (no BUG-7). Pairs with 13-cross-tz-save-IST.',
+        tcRef: 'research/date-handling/forms-calendar/test-cases/tc-13-cross-tz-save.md',
+    },
+    {
+        id: '13-cross-tz-save-IST',
+        category: 13,
+        categoryName: 'DB Storage via API',
+        config: 'A',
+        tz: 'IST',
+        tzOffset: 'GMT+0530',
+        action: 'saveAndApiRead',
+        browserInputs: [
+            { config: 'A', value: '2026-03-15' },
+            { config: 'D', value: '2026-03-15T00:00:00' },
+        ],
+        apiAssertions: [
+            { config: 'A', expected: '2026-03-14T00:00:00Z' },
+            { config: 'D', expected: '2026-03-15T00:00:00Z' },
+        ],
+        bugs: ['FORM-BUG-7'],
+        notes: 'IST save exposes FORM-BUG-7 on Config A — date shifts -1 day. Config D (ignoreTimezone=true) is immune. Same user action produces different DB values based on browser TZ.',
+        tcRef: 'research/date-handling/forms-calendar/test-cases/tc-13-cross-tz-save.md',
+    },
+    {
+        id: '13-preset-vs-user-input-BRT',
+        category: 13,
+        categoryName: 'DB Storage via API',
+        config: 'A',
+        tz: 'BRT',
+        tzOffset: 'GMT-0300',
+        action: 'saveAndApiRead',
+        browserInputs: [{ config: 'A', value: '2026-03-15' }],
+        apiAssertions: [
+            { config: 'A', variant: 'preset', expected: '2026-03-01T03:00:00Z' },
+            { config: 'A', expected: '2026-03-15T00:00:00Z' },
+        ],
+        bugs: [],
+        notes: 'Same record contains UTC-stored (preset) and local-stored (user-input) values for the same Config A. SQL queries cannot reliably compare across field types.',
+        tcRef: 'research/date-handling/forms-calendar/test-cases/tc-13-preset-vs-user-input.md',
+    },
+    {
+        id: '13-preset-vs-user-input-IST',
+        category: 13,
+        categoryName: 'DB Storage via API',
+        config: 'A',
+        tz: 'IST',
+        tzOffset: 'GMT+0530',
+        action: 'saveAndApiRead',
+        browserInputs: [{ config: 'A', value: '2026-03-15' }],
+        apiAssertions: [
+            { config: 'A', variant: 'preset', expected: '2026-02-28T18:30:00Z' },
+            { config: 'A', expected: '2026-03-14T00:00:00Z' },
+        ],
+        bugs: ['FORM-BUG-7'],
+        notes: 'IST variant: preset shifts to previous month (Feb 28 18:30 UTC = IST midnight March 1), user-input shifts -1 day via BUG-7. Both wrong in different ways.',
+        tcRef: 'research/date-handling/forms-calendar/test-cases/tc-13-preset-vs-user-input.md',
+    },
+    {
+        id: '13-query-consistency',
+        category: 13,
+        categoryName: 'DB Storage via API',
+        config: 'A',
+        tz: 'BRT',
+        tzOffset: 'GMT-0300',
+        action: 'querySameLogicalDate',
+        browserInputs: [{ config: 'A', value: '2026-03-15' }],
+        altTz: { name: 'IST', timezoneId: 'Asia/Kolkata' },
+        queryConfig: 'A',
+        queryDate: '2026-03-15',
+        bugs: ['FORM-BUG-7'],
+        notes: 'Save same logical date from BRT and IST browsers, then OData-query [Field7] eq "2026-03-15". BRT record is found; IST record is missing because BUG-7 stored it as March 14. Query engine is correct — storage is the problem.',
+        tcRef: 'research/date-handling/forms-calendar/test-cases/tc-13-query-consistency.md',
+    },
+    {
+        id: '13-after-roundtrip',
+        category: 13,
+        categoryName: 'DB Storage via API',
+        config: 'D',
+        tz: 'BRT',
+        tzOffset: 'GMT-0300',
+        action: 'roundtripSaveAndApiRead',
+        sfvInput: '2026-03-15',
+        roundTrips: 1,
+        expectedApi: '2026-03-14T21:00:00Z',
+        bugs: ['FORM-BUG-5'],
+        notes: 'Single SFV(GFV()) round-trip on Config D in BRT drifts -3h. Save persists the drifted value to DB — API read confirms the corruption survives the save pipeline.',
+        tcRef: 'research/date-handling/forms-calendar/test-cases/tc-13-after-roundtrip.md',
+    },
+    {
+        id: '13-multi-roundtrip-db',
+        category: 13,
+        categoryName: 'DB Storage via API',
+        config: 'D',
+        tz: 'BRT',
+        tzOffset: 'GMT-0300',
+        action: 'roundtripSaveAndApiRead',
+        sfvInput: '2026-03-15',
+        roundTrips: 8,
+        expectedApi: '2026-03-14T00:00:00Z',
+        bugs: ['FORM-BUG-5'],
+        notes: '8 round-trips × -3h each = -24h total; calendar day fully lost. Worst-case BUG-5 drift in BRT.',
+        tcRef: 'research/date-handling/forms-calendar/test-cases/tc-13-multi-roundtrip-db.md',
     },
 ];
 

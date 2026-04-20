@@ -61,6 +61,8 @@ function loadConfig() {
 
     return {
         instance,
+        serverKey: serverName,
+        customerKey: customerName,
         loginUrl: server.baseUrl,
         baseUrl: server.baseUrl,
         username: customer.username,

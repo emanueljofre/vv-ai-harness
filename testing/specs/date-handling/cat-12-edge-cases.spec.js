@@ -21,13 +21,22 @@ const {
     roundTripCycle,
 } = require('../../helpers/vv-form');
 
-const categoryTests = TEST_DATA.filter((t) => t.category === 12);
+// Skip non-executable entries: umbrella slots aggregate child TCs, skip/theoretical
+// slots have no runnable scenario. They live in test-data.js for matrix linkage only.
+const NON_EXECUTABLE_ACTIONS = new Set(['umbrella', 'skip', 'theoretical']);
+const categoryTests = TEST_DATA.filter((t) => t.category === 12 && !NON_EXECUTABLE_ACTIONS.has(t.action));
 
 for (const tc of categoryTests) {
     test.describe(`TC-${tc.id}: ${tc.categoryName}, Config ${tc.config}`, () => {
         test(`${tc.id} — ${tc.notes.substring(0, 60)}`, async ({ page }, testInfo) => {
             // Only run this test in the matching timezone project
             test.skip(!testInfo.project.name.startsWith(tc.tz), `Skipping — test is for ${tc.tz}`);
+
+            // Empty/null/invalid inputs: under V2, VV.Form.SetFieldValue(name, '' | null) never
+            // resolves — the page.evaluate stalls indefinitely. Cap this test at 15s so the hang
+            // is recorded as a fast failure (V2 observation) instead of eating the default 60s.
+            const isEdgeInput = tc.inputDateStr === '' || tc.inputDateStr === null || tc.inputDateStr === 'not-a-date';
+            if (isEdgeInput) test.setTimeout(15000);
 
             // Navigate to fresh form and wait for VV.Form ready
             await gotoAndWaitForVVForm(page, FORM_TEMPLATE_URL);
@@ -37,9 +46,15 @@ for (const tc of categoryTests) {
             expect(dateStr).toContain(tc.tzOffset);
 
             // Verify code path (V1 vs V2)
+            // Verify code path (V1 vs V2) and skip if entry scope does not match.
+            // Entries default to V1 scope; .V2 entries set `scope: 'V2'`. V1 and V2
+            // coexist in TEST_DATA for the same category so we can track both
+            // baselines; the live env picks the matching set at runtime.
             const isV2 = await getCodePath(page);
+            const envScope = isV2 ? 'V2' : 'V1';
+            const entryScope = tc.scope || 'V1';
+            test.skip(envScope !== entryScope, `Entry scope=${entryScope} but active env is ${envScope}`);
             const fieldCfg = FIELD_MAP[tc.config];
-            expect(isV2).toBe(false);
 
             // Verify field
             const fieldName = await verifyField(page, {
