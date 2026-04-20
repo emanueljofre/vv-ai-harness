@@ -1,0 +1,20 @@
+{
+  "tab": "Details",
+  "tabParam": "Details",
+  "sections": ["Customer Properties", "Customer Logo", "Login Page Logo:", "Menu Logo:"],
+  "inputs": [
+    { "id": "txtCustomerName", "label": "Name", "type": "text", "value": "Emanuel Jofre" },
+    { "id": "txtCustomerAlias", "label": "Alias", "type": "text", "value": "EmanuelJofre" },
+    { "id": "txtCustomerDescription", "label": "Description", "type": "textarea", "value": "Emanuel Jofre" },
+    { "id": "txtCustomerNotes", "label": "Notes", "type": "textarea", "value": "" }
+  ],
+  "checkboxes": [
+    { "id": "cbIsActive", "label": "Active", "checked": true }
+  ],
+  "dropdowns": [
+    { "id": "ddlTimeZone", "label": "Time Zone:", "telerik": true, "selected": "(UTC) Coordinated Universal Time" },
+    { "id": "ddlUserCulture", "label": "Culture:", "telerik": true, "selected": "English (United States)" },
+    { "id": "ddlUserUiCulture", "label": "Language:", "telerik": true, "selected": "English" }
+  ],
+  "buttons": []
+}

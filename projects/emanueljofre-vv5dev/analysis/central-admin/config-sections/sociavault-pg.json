@@ -1,0 +1,30 @@
+{
+  "section": "SociaVault PG",
+  "scope": "customer + database",
+  "heading": "Emanuel Jofre: Main Settings : SociaVault PG",
+  "note": "Vertical-specific config — SociaVault PG (Peer Group? Population Growth?) is a product variant for behavioral-health / case-management workflows. 18 named URL/template slots. All vertical-specific — not relevant to date-handling or core form behavior.",
+  "capturedAt": "2026-04-20",
+  "kind": "URL + form-template mapping for a vertical product module",
+  "inputs": [
+    { "label": "Provider Utilization Data URL:" },
+    { "label": "Self Assessment Tests URL:" },
+    { "label": "Discharge Clients URL:" },
+    { "label": "Browse Clients URL:" },
+    { "label": "Create SAT URL:" },
+    { "label": "View Sat URL:" },
+    { "label": "View Outreach URL:" },
+    { "label": "All Clients URL:" },
+    { "label": "View Invoices URL:" },
+    { "label": "Client Intake Form Template Name:" },
+    { "label": "Client Exemption Form Template Name:" },
+    { "label": "Client Discharge Form Template Name:" },
+    { "label": "Client SAT Form Template Name:" },
+    { "label": "PO Form Template Name:" },
+    { "label": "PO Amendment Form Template Name:" },
+    { "label": "Client Utilization Form Template Name:" },
+    { "label": "Outreach Request Form Template Name:" },
+    { "label": "Invoice Form Template Name:" }
+  ],
+  "checkboxes": [],
+  "dropdowns": []
+}

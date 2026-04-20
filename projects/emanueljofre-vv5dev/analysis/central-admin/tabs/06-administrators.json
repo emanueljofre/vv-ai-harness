@@ -1,0 +1,11 @@
+{
+  "tab": "Customer Administrators",
+  "tabParam": "Administrators",
+  "sections": ["Customer Administrators"],
+  "note": "Page contains a toolbar + RadGrid (radGridCustomerAdmins) listing customer administrators. Grid was empty / not AJAX-loaded at capture time. No free-text settings here — pure administration listing.",
+  "controls": {
+    "toolbar": "radToolBar1",
+    "panels": ["pnlViewAdminsPanel", "pnlViewAdmins"],
+    "grid": "radGridCustomerAdmins"
+  }
+}

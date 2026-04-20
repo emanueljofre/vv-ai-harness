@@ -1,0 +1,12 @@
+{
+  "section": "Intelligent Objects",
+  "scope": "customer + database",
+  "heading": "Emanuel Jofre: Main Settings : Intelligent Objects",
+  "note": "Very small section — feature flag only. Intelligent Objects are disabled on this customer.",
+  "inputs": [],
+  "dropdowns": [],
+  "checkboxes": [
+    { "label": "Enable Intelligent Objects:", "checked": false },
+    { "label": "Allow Vault Access to Assign Package:", "checked": false }
+  ]
+}

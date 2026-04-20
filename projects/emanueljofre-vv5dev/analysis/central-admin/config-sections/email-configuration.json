@@ -1,0 +1,41 @@
+{
+  "section": "Email Configuration",
+  "scope": "customer + database (same structure)",
+  "heading": "Emanuel Jofre: Main Settings : Email Configuration",
+  "note": "SMTP + AWS bounce check + VV transmittal + subscription digest. Secrets (passwords, AWS keys) redacted in captures — do not extract.",
+  "capturedAt": "2026-04-20",
+  "inputs": [
+    { "label": "SMTP Server:", "value": "hmail-relay.visualvault.com" },
+    { "label": "SMTP Server Port:", "value": "25" },
+    { "label": "SMTP Mail From Address:", "value": "no.reply@visualvault.com" },
+    { "label": "Sender Name:", "value": "VisualVault" },
+    { "label": "SMTP User ID:", "value": "" },
+    { "label": "SMTP Password:", "value": "[REDACTED]" },
+    { "label": "Error Report Email Address:", "value": "support@visualvault.com" },
+    { "label": "VisualVault Email Send From Email Address:", "value": "support@visualvault.com" },
+    { "label": "VisualVault Email Web Mail User ID:", "value": "" },
+    { "label": "VisualVault Email Web Mail Password:", "value": "[REDACTED]" },
+    { "label": "Prefix the Document ID of Saved Emails:", "value": "" },
+    { "label": "Prefix the Descripition of Save Emails:", "value": "" },
+    { "label": "Email Retry Limit:", "value": "10" },
+    { "label": "Email Address Exclusions:", "value": "unknown@unknown.com" },
+    { "label": "Email Bounce Check AWS Access Key:", "value": "[REDACTED]" },
+    { "label": "Email Bounce Check AWS Secret Key:", "value": "[REDACTED]" },
+    { "label": "Email Bounce Check AWS Region:", "value": "us-east-1" },
+    { "label": "Transmittal Reason Drop Down List Options:", "value": "" },
+    { "label": "Subscription Digest Email Subject:", "value": "You have new VisualVault notifications" }
+  ],
+  "checkboxes": [
+    { "label": "SMTP Server Enable TLS:", "checked": false },
+    { "label": "Log all SMTP Server Communications:", "checked": true },
+    { "label": "Log SMTP Server Communication Errors:", "checked": true },
+    { "label": "Use VisualVault Web Email Screen:", "checked": false },
+    { "label": "Use Outlook Add-In to Send Email:", "checked": false },
+    { "label": "Save Outbound Emails in VisualVault:", "checked": false },
+    { "label": "Enable Email Bounce Check:", "checked": true },
+    { "label": "Display Transmittal Reason Drop Down List:", "checked": false },
+    { "label": "Add Users To Document Level Security During Emailing Embedded Links:", "checked": false },
+    { "label": "Send Email Immediate:", "checked": true },
+    { "label": "Enable Subscription Digest:", "checked": false }
+  ]
+}

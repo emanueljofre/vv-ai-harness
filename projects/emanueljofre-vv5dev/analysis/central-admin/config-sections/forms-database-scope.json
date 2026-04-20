@@ -1,0 +1,39 @@
+{
+  "section": "Forms",
+  "scope": "database",
+  "heading": "Emanuel Jofre: Main Settings : Forms",
+  "accessedVia": "Central Admin → Customer: Emanuel Jofre → Databases → [Main] → Database Settings → toolbar dropdown 'Configuration Sections' → 'Forms'",
+  "url": "/ca/ConfigureCustomerDatabaseDetails?customerid=2e8486fc-d03c-f111-8312-f68855a47462&customerdatabaseid=773f7020-d13c-f111-8312-f68855a47462&tab=DatabaseSettings",
+  "capturedAt": "2026-04-20",
+  "dateHandlingFlags": {
+    "useUpdatedCalendarControlLogic": true,
+    "convertDateFieldsToCustomerTimezone": false,
+    "preventConversionForDatesIgnoringTimezones": false
+  },
+  "note": "Database scope has V2 calendar logic ENABLED, which is what the runtime probe reports. Customer scope has it disabled — DB overrides.",
+  "checkboxes": [
+    { "label": "Refresh the parent window when closing the Form window:", "checked": true },
+    { "label": "Show Workflow Task Completion In Forms:", "checked": true },
+    { "label": "Perform FormField Consistency Check:", "checked": false },
+    { "label": "Use Template Conditions For DataInstances:", "checked": false },
+    { "label": "Use Growth Factor ForText Area When Printing:", "checked": false },
+    { "label": "Editors Can View And Modify Workflow:", "checked": true },
+    { "label": "Allow MultiEdit Form View:", "checked": true },
+    { "label": "Set Multi-Edit Default to True:", "checked": false },
+    { "label": "Try to Parse Data Lookup Values as Numeric:", "checked": true },
+    { "label": "Use Form Database Lookup For Repeating Row Controls:", "checked": true },
+    { "label": "Parse JSON Dropdownlist Values:", "checked": true },
+    { "label": "Use Beta Form Viewer:", "checked": true },
+    { "label": "Use Beta Form Optimizations:", "checked": true },
+    { "label": "Open Form Viewer in New Tab:", "checked": true },
+    { "label": "Form Designer Render Optimization:", "checked": true },
+    { "label": "Convert Date Fields to Customer Timezone:", "checked": false },
+    { "label": "Prevent Conversion For Dates Ignoring Timezones:", "checked": false },
+    { "label": "Allow ID Card Mode:", "checked": false },
+    { "label": "Disable External Script File Caching:", "checked": true },
+    { "label": "Enable Replace Form Revision:", "checked": false },
+    { "label": "Use Updated Calendar Control Logic:", "checked": true },
+    { "label": "Enable Form Signature Security:", "checked": false },
+    { "label": "Use Offline Forms 2.0:", "checked": true }
+  ]
+}

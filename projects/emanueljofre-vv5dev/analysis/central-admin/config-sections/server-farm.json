@@ -1,0 +1,23 @@
+{
+  "section": "Server Farm",
+  "scope": "customer + database",
+  "heading": "Emanuel Jofre: Main Settings : Server Farm",
+  "note": "Server-farm endpoint URLs + distributed cache + process server. Most endpoints blank (platform defaults). `Minutes to Cache Time Zone Value: 20` — the customer TZ (from Details tab) is cached for 20 min client-side; relevant when testing server-generated timestamps after TZ changes.",
+  "capturedAt": "2026-04-20",
+  "endpointUrls": [
+    "API URL Retry Seconds: 60",
+    "API Maximum Chunk Size (bytes): 4194304 (4 MB)",
+    "Default Endpoint URLs: (blank)",
+    "Acrobat Add-In, Adobe Add-In, AutoCAD Add-In, Conversion Service, Email Service, Enterprise LDAP Service, Excel Add-In, Fax Service, Image Viewer, Import Service, Index Server, Kofax Express Add-In, Lotus Notes Add-In, Ocr Server, Outlook Add-In, Report Server, SolidWorks Add-In, VisualVault Cloud Drive, Word Add-In: all blank",
+    "Distributed Cache Head Cluster Nodes: (blank)"
+  ],
+  "keyValues": {
+    "Minutes to Cache Time Zone Value": "20",
+    "Process Server Retry Seconds": "60",
+    "Process Server Locations": "XML: <ProcessServiceEndPoints><EndPoint URI=\"net.tcp://localhost:8790\" Online=\"true\" WebServer=\"any\" .../>"
+  },
+  "checkboxes": [
+    { "label": "Compute checksum on each call to the InsertFileChunk Web Service:", "checked": true },
+    { "label": "Distributed Cache Enabled:", "checked": false }
+  ]
+}

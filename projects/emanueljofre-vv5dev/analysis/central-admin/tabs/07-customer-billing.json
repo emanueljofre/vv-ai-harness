@@ -1,0 +1,28 @@
+{
+  "tab": "Customer Billing",
+  "tabParam": "CustomerBilling",
+  "sections": ["Customer Organization", "Subscription Detail", "Customer Billing"],
+  "inputs": [
+    { "id": "txtOrganizationAddress1", "section": "Customer Organization", "label": "Address 1", "type": "text", "value": "" },
+    { "id": "txtOrganizationAddress2", "section": "Customer Organization", "label": "Address 2", "type": "text", "value": "" },
+    { "id": "txtOrganizationCity", "section": "Customer Organization", "label": "City", "type": "text", "value": "" },
+    { "id": "txtOrganizationZipCode", "section": "Customer Organization", "label": "Zip Code", "type": "text", "value": "" },
+    { "id": "txtVendorSubscriptionId", "section": "Subscription Detail", "label": "Vendor Subscription Id", "type": "text", "value": "" },
+    { "id": "txtBillingID", "section": "Subscription Detail", "label": "Billing ID", "type": "text", "value": "" }
+  ],
+  "dropdowns": [
+    { "id": "ddlOrganizationState", "section": "Customer Organization", "label": "State", "selected": "" },
+    { "id": "ddlSubscriptionPlan", "section": "Subscription Detail", "label": "Subscription Plan", "selected": "" },
+    { "id": "ddlAccountStatus", "section": "Subscription Detail", "label": "Account Status", "selected": "" },
+    { "id": "ddlEventFilter", "section": "Customer Billing (audit log filter)", "label": "Filter", "selected": "All Entries", "optionCount": 6 }
+  ],
+  "grids": [
+    {
+      "id": "radGridBillingEvents",
+      "section": "Customer Billing",
+      "headers": ["Details", "Date", "Event", "Previous Status", "New Status", "Previous Subscription Plan", "New Subscription Plan", "Event By"],
+      "rowCount": 1,
+      "note": "Billing event history — empty on this fresh customer"
+    }
+  ]
+}

@@ -1,0 +1,36 @@
+{
+  "section": "Service Tasks",
+  "scope": "customer + database",
+  "heading": "Emanuel Jofre: Main Settings : Service Tasks",
+  "note": "Scheduled background tasks (document audit, purge, reindex, expirations, user/password lifecycle). Most tasks are enabled. `<DocLogCategory>` XML configures per-category retention (e.g., DocumentRelationship enabled 360 days).",
+  "capturedAt": "2026-04-20",
+  "inputs": [
+    { "label": "Reindex suspect documents - time span (seconds):", "value": "60" },
+    { "label": "Audit Log Purge Options:", "valuePreview": "<DocLogCategory><DocumentRelationship enabled=\"true\" days=\"360\">...</DocLogCategory>" },
+    { "label": "Job Status Cache Seconds:", "value": "60" },
+    { "label": "Service Account Names:", "value": "" }
+  ],
+  "checkboxes": [
+    { "label": "Allow content stores to move files:", "checked": false },
+    { "label": "Verify files exist:", "checked": true },
+    { "label": "Calculate and store file Checksum values:", "checked": true },
+    { "label": "Verify file Checksum values match stored values:", "checked": true },
+    { "label": "Document Archive:", "checked": true },
+    { "label": "Document Expiration:", "checked": true },
+    { "label": "Document Review:", "checked": true },
+    { "label": "Check for missing index flags:", "checked": false },
+    { "label": "Check for extra index flags:", "checked": false },
+    { "label": "Check for modified after indexing:", "checked": false },
+    { "label": "Check for purged documents:", "checked": false },
+    { "label": "Verify deleted document index status:", "checked": false },
+    { "label": "Reindex suspect documents:", "checked": true },
+    { "label": "Enable Automatic Audit Log Purging:", "checked": false },
+    { "label": "Remove No Access:", "checked": true },
+    { "label": "Expired Training Renewal:", "checked": true },
+    { "label": "User Expiration:", "checked": true },
+    { "label": "Expire User Account:", "checked": true },
+    { "label": "User Password Expiration:", "checked": true },
+    { "label": "Warning Task Escalation:", "checked": true },
+    { "label": "Deadline Task Escalation:", "checked": true }
+  ]
+}

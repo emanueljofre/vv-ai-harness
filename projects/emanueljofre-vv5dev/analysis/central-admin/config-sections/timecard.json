@@ -1,0 +1,44 @@
+{
+  "section": "Timecard",
+  "scope": "customer + database",
+  "heading": "Emanuel Jofre: Main Settings : Timecard",
+  "note": "Vertical-specific: time-card, leave, overtime, deviated work schedule workflows. Maps form-template names to approval-task sequences. **Pay Period Start Date: 1/1/2005** + **Days In Pay Period: 14** — these drive date-math for every timecard. `<EmployeeStatus>` + `<HolidayFormFields>` XML control UI options.",
+  "capturedAt": "2026-04-20",
+  "dateHandlingRelevant": {
+    "Pay Period Start Date": "1/1/2005",
+    "Days In Pay Period": "14",
+    "note": "Bi-weekly pay period anchored on 2005-01-01. Timecard forms use these + the pay-period start/end field names below."
+  },
+  "formTemplateMappings": {
+    "Timecard Form Template Name": "Time Card",
+    "Leave Form Template Name": "Leave Form",
+    "Overtime Authorization Template Name": "Overtime Authorization",
+    "Deviated Work Schedule Template Name": "Deviated Work Authorization"
+  },
+  "taskSequences": {
+    "Timecard Employee / Supervisor / Accounting": "2 / 4 / 5",
+    "Leave Form Employee / Supervisor / Account": "2 / 4 / 5"
+  },
+  "payPeriodFieldNames": {
+    "Timecard": { "start": "PayStart", "end": "PayEnd" },
+    "Leave Form": { "start": "Leave Start", "end": "Leave End" },
+    "Overtime Authorization": { "start": "D1", "end": "D14" },
+    "Deviated Work Schedule": { "start": "D1", "end": "D14" }
+  },
+  "dashboardNames": [
+    "Time Cards", "My Timecards", "Leave Forms", "My Leave Forms",
+    "OverTime Authorization", "My Overtime Authorization",
+    "Deviated Work Schedule Authorization", "My Deviated Work Schedule Authorization"
+  ],
+  "groupNames": {
+    "Employee Group": "TimeCardEmployees",
+    "Accounting Group": "Accounting"
+  },
+  "xmlFields": [
+    "Employee Status (StatusOptions mapping)",
+    "Holiday Form Fields (FieldNames WK1-10A etc.)"
+  ],
+  "checkboxes": [
+    { "label": "(1 checkbox — not fully captured, likely timecard feature enable flag)" }
+  ]
+}

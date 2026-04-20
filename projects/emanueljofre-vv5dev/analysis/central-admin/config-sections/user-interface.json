@@ -1,0 +1,50 @@
+{
+  "section": "User Interface",
+  "scope": "customer + database",
+  "heading": "Emanuel Jofre: Main Settings : User Interface",
+  "note": "UI feature flags: accessibility, legacy-vs-new admin pages, menu visibility, beta task list, workspace manager. Most `Use legacy` toggles are ON — this customer is running the legacy UI for Menus/Fields/Dropdowns/Sites/Groups/Form Lists.",
+  "capturedAt": "2026-04-20",
+  "inputs": [
+    { "label": "OEM Login Title:", "value": "" },
+    { "label": "OEM Login Title URL:", "value": "" },
+    { "label": "Help URL:", "value": "http://help.visualvault.com" }
+  ],
+  "dropdowns": [
+    { "label": "(1 dropdown — likely Color Theme or Language Default)" }
+  ],
+  "checkboxes": [
+    { "label": "Enable Ease of Access Features:", "checked": false },
+    { "label": "Enable accessiBe:", "checked": false },
+    { "label": "Enable Support Widget:", "checked": false },
+    { "label": "Use legacy \"Menus\" settings:", "checked": true },
+    { "label": "Use legacy \"Index Fields\" settings:", "checked": true },
+    { "label": "Use legacy \"Dropdown Lists\" settings:", "checked": true },
+    { "label": "Use legacy \"Sites\" settings:", "checked": true },
+    { "label": "Use legacy \"Groups\" settings:", "checked": true },
+    { "label": "Use legacy \"form lists\" settings:", "checked": true },
+    { "label": "Hide Login Language Selector:", "checked": false },
+    { "label": "Hide Advert Section:", "checked": false },
+    { "label": "Hide Default 'Document Search' and 'Full Text' search options for non-admins:", "checked": false },
+    { "label": "Display database selection when only one database:", "checked": false },
+    { "label": "Hide Language Selector:", "checked": false },
+    { "label": "Hide Search:", "checked": false },
+    { "label": "Hide Searches Menu:", "checked": false },
+    { "label": "Hide Training Menu:", "checked": false },
+    { "label": "Hide Open Forms Menu:", "checked": false },
+    { "label": "Hide Email Alerts Menu:", "checked": false },
+    { "label": "Hide My Preferences Menu:", "checked": false },
+    { "label": "Hide Change Password Menu:", "checked": true },
+    { "label": "Hide Control Panel Menu:", "checked": false },
+    { "label": "Enable New Color Palette:", "checked": false },
+    { "label": "Redirect to New Form Template Administration:", "checked": false },
+    { "label": "Hide My Preferences:", "checked": false },
+    { "label": "Hide Change Password:", "checked": false },
+    { "label": "Hide Training:", "checked": false },
+    { "label": "Enable Document Pipeline Configuration:", "checked": false },
+    { "label": "Use Document Description Instead of Document Id in Task List:", "checked": false },
+    { "label": "Display task completion window when completing multiple tasks from Task List:", "checked": true },
+    { "label": "Enable Beta Task List:", "checked": true },
+    { "label": "Enable Workspace Manager:", "checked": false },
+    { "label": "Redirect Workspace Manager:", "checked": false }
+  ]
+}

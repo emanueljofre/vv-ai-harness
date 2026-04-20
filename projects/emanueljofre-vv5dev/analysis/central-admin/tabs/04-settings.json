@@ -1,0 +1,157 @@
+{
+  "tab": "Configuration Settings",
+  "tabParam": "ConfigSettings",
+  "parentTab": "Settings",
+  "note": "Settings tab landing page (`tab=Settings`) renders the same content as `tab=ConfigSettings`. Settings are grouped into 13 sub-sections shown on a single scrollable page. Sections below were derived by walking DOM in order and attributing each control to the most recent h2/h3 heading.",
+  "sections": {
+    "Content Providers": {
+      "inputs": [],
+      "checkboxes": [
+        { "label": "Allow Owner / Editors to Download Corrupt Files:", "checked": true }
+      ]
+    },
+    "Culture And Time": {
+      "inputs": [
+        { "label": "Current Culture:", "type": "text", "value": "English (United States)" }
+      ],
+      "checkboxes": []
+    },
+    "Customer Billing Settings": {
+      "inputs": [
+        { "label": "Idle Timeout:", "type": "text", "value": "1200" },
+        { "label": "Warning Timeout:", "type": "text", "value": "30" }
+      ],
+      "checkboxes": [
+        { "label": "Allow Public Shares:", "checked": false }
+      ]
+    },
+    "Database": {
+      "inputs": [],
+      "checkboxes": [
+        { "label": "Use SQL2005 Commands:", "checked": false },
+        { "label": "Use Unicode Upgrade Script:", "checked": true }
+      ]
+    },
+    "Logs and Paths": {
+      "inputs": [
+        { "label": "Days to Retain Exception Log Messages:", "type": "text", "value": "1" },
+        { "label": "Days to Retain Information Log Messages:", "type": "text", "value": "2" },
+        { "label": "Days to Retain Email Log Messages:", "type": "text", "value": "30" },
+        { "label": "Days to Retain LDAP Import Log Messages:", "type": "text", "value": "30" },
+        { "label": "URL Content Base:", "type": "text", "value": "https://vv5dev.visualvault.com" }
+      ],
+      "checkboxes": [
+        { "label": "Enable Verbose Logging:", "checked": false },
+        { "label": "Log document events to information log:", "checked": false },
+        { "label": "Log resource key does not exist event to information log:", "checked": false }
+      ]
+    },
+    "Performance and Timeouts": {
+      "inputs": [
+        { "label": "Web Session Timeout Minutes:", "type": "text", "value": "600" },
+        { "label": "Max Row Count:", "type": "text", "value": "1000" },
+        { "label": "SQL Connection Timeout:", "type": "text", "value": "60" },
+        { "label": "Scroll Speed:", "type": "text", "value": "20" },
+        { "label": "Default Rows Per Page:", "type": "text", "value": "15" },
+        { "label": "Requests per Minute:", "type": "text", "value": "1000" },
+        { "label": "Request Throttling per User:", "type": "text", "value": "" }
+      ],
+      "checkboxes": [
+        { "label": "Rebuild Schema Bound View On Group Edit:", "checked": false },
+        { "label": "Enable Request Throttling:", "checked": false },
+        { "label": "Enable Request Throttling per User:", "checked": false }
+      ]
+    },
+    "Resource Scheduler": {
+      "inputs": [
+        { "label": "Days of the Work Week:", "type": "textarea", "valuePreview": "<WorkWeek><DayOfWeek>Monday</DayOfWeek>...<DayOfWeek>Friday</DayOfWeek></WorkWeek>" }
+      ],
+      "checkboxes": [
+        { "label": "Is MyAvailability Visible:", "checked": false }
+      ]
+    },
+    "Security and Login": {
+      "inputs": [
+        { "label": "IP Address Restrictions:", "type": "text", "value": "" },
+        { "label": "SSO IP Address Restrictionss:", "type": "text", "value": "" },
+        { "label": "Login Image Path:", "type": "text", "value": "" },
+        { "label": "Default Authentication Type:", "type": "text", "value": "VisualVaultDatabase" },
+        { "label": "Login Token Expiration Minutes:", "type": "text", "value": "5" },
+        { "label": "Encryption Master Key Password:", "type": "password", "value": "" },
+        { "label": "BofA Saml Pfx File Password:", "type": "password", "value": "" },
+        { "label": "BofA Saml Url:", "type": "text", "value": "" },
+        { "label": "BofA Partner Key:", "type": "text", "value": "" }
+      ],
+      "checkboxes": [
+        { "label": "Always allow non-routable (internal) IP Addresses:", "checked": true },
+        { "label": "Enable External Authentication:", "checked": false },
+        { "label": "Enable Session End Notification:", "checked": false },
+        { "label": "Store User Ldap Groups in Cookie:", "checked": false },
+        { "label": "Sign Saml Authn Requests:", "checked": false },
+        { "label": "Enable session cookie secure flag:", "checked": false },
+        { "label": "Enable cross site cookie:", "checked": false },
+        { "label": "Enable User Security Assignments:", "checked": false },
+        { "label": "Disable login by query string user and password:", "checked": false },
+        { "label": "Allow Automatic Addition of SSO Users to VaultAccess Group:", "checked": false },
+        { "label": "Enable Roles and Permissions Security:", "checked": false },
+        { "label": "Use Custom Query Public Access Setting:", "checked": false },
+        { "label": "Require Multi-factor Authentication:", "checked": false },
+        { "label": "Always Display SSO Login Link:", "checked": false },
+        { "label": "Enable Api Users Role Check:", "checked": false }
+      ]
+    },
+    "Training": {
+      "inputs": [
+        { "label": "User Training Link Text:", "type": "text", "value": "Training" },
+        { "label": "User Training Link Header Text:", "type": "text", "value": "Learning Objects" },
+        { "label": "User Initiate Training Headline Text:", "type": "text", "value": "Training for Learning Object:" }
+      ],
+      "checkboxes": [
+        { "label": "Users Can Initiate Document Training:", "checked": false }
+      ]
+    },
+    "User Portal Settings": {
+      "inputs": [
+        { "label": "Portal Redirect URL:", "type": "text", "value": "" }
+      ],
+      "checkboxes": [
+        { "label": "Append Access Token to Redirect URL:", "checked": false }
+      ]
+    },
+    "Users": {
+      "inputs": [
+        { "label": "Username Format:", "type": "text", "value": "UserId" },
+        { "label": "Signature Username Format:", "type": "text", "value": "UserId" },
+        { "label": "Label for Employee ID:", "type": "text", "value": "Employee ID" },
+        { "label": "Default Days for Password Expiration:", "type": "text", "value": "180" }
+      ],
+      "checkboxes": [
+        { "label": "Drop down for Employee Status visible:", "checked": true },
+        { "label": "Verbose Login:", "checked": false }
+      ]
+    },
+    "Workflow": {
+      "inputs": [
+        { "label": "Default Days for an Approval Task:", "type": "text", "value": "5" },
+        { "label": "Workflow Task Completion Options:", "type": "textarea", "valuePreview": "<WorkflowTaskCompletionNames><OneOptionNames><option key=\"1\" Name=\"Acknowledge\" .../>" },
+        { "label": "Training Competency Levels:", "type": "textarea", "valuePreview": "<TrainingCompetencyLevels><option key=\"1\" name=\"1 Low\" /><option key=\"2\" name=\"2 Medium Low\" />..." }
+      ],
+      "checkboxes": [
+        { "label": "Disable Workflow Notifications:", "checked": false },
+        { "label": "Disable Training Notifications:", "checked": false },
+        { "label": "Use Numeric Comparisons:", "checked": true },
+        { "label": "Task List - Show Tasks:", "checked": true },
+        { "label": "Task List - Show Approvals:", "checked": true },
+        { "label": "Task List - Show Training:", "checked": true },
+        { "label": "Task List - Show Training Approvals:", "checked": true },
+        { "label": "Disable Workflow Task Completion from Task List:", "checked": false },
+        { "label": "Check Previous Workflow Conditions During Workflow Task Approval and Completion:", "checked": true },
+        { "label": "KeyDoesNotExist:", "checked": false },
+        { "label": "Allow Legacy Workflow:", "checked": false },
+        { "label": "Disable Event Sources:", "checked": false },
+        { "label": "Log Legacy Workflow Evaluation:", "checked": false },
+        { "label": "Terminate Active Workflows on Object Delete:", "checked": false }
+      ]
+    }
+  }
+}

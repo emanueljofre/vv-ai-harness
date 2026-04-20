@@ -26,10 +26,10 @@ All data extracted via `tools/extract/` from the EmanuelJofre admin panels on vv
 | Web Services       | —     | `extracts/web-services/`     |
 | Scheduled Services | —     | `extracts/schedules/`        |
 | Global Functions   | —     | `extracts/global-functions/` |
-| Form Templates     | —     | `extracts/form-templates/`   |
+| Form Templates     | 1 template (Date Test Harness) | `extracts/form-templates/`   |
 | Custom Queries     | —     | `extracts/custom-queries/`   |
 
-Last full extraction: not yet run.
+Full extraction not yet run. Date Test Harness extracted 2026-04-20 for the V2 baseline test run.
 
 ## Commands
 
@@ -47,10 +47,42 @@ node tools/extract/extract.js --project emanueljofre-vv5dev --dry-run
 
 ## Analysis
 
-No analysis files yet. Run exports first, then use:
+- [`analysis/central-admin/`](analysis/central-admin/README.md) — Central Admin customer-config snapshot (v3041, captured 2026-04-20): per-tab JSON, settings index, key environment facts. See [docs/architecture/visualvault-platform.md § Central Admin](../../docs/architecture/visualvault-platform.md#central-admin-cross-customer-control-panel) for the platform-level documentation.
+
+Other analysis starting points (when extracts exist):
 
 - `node tools/inventory/inventory-fields.js` for field inventory
 - `node tools/inventory/inventory-scripts.js` for script inventory
+
+## Testing
+
+V2 date-handling baseline — execution data in `testing/date-handling/`:
+
+- [`testing/date-handling/status.md`](testing/date-handling/status.md) — full chromium regression summary (per-TZ, per-category)
+- [`testing/date-handling/failures.md`](testing/date-handling/failures.md) — per-failure Expected vs Received table
+- [`testing/date-handling/failures.json`](testing/date-handling/failures.json) — structured failure data
+- [`testing/date-handling/regression-results-latest.json`](testing/date-handling/regression-results-latest.json) — custom-reporter structured output (per-TC status + actual values + `buildContext.fingerprint`)
+- `testing/date-handling/full-log.log` — raw playwright output
+
+### Build timeline
+
+Every regression JSON embeds a `buildContext` with a short fingerprint (SHA-8 of `environment` + `progVersion` + `dbVersion` + `formViewerBuild`) so runs can be correlated with platform rollouts. Derive the timeline on demand — no separate file to maintain:
+
+```bash
+npm run build:timeline -- --project EmanuelJofre-vv5dev
+npm run build:timeline -- --project EmanuelJofre-vv5dev --tc TC-1-D-BRT   # per-TC history across builds
+npm run build:timeline -- --project EmanuelJofre-vv5dev --json            # machine-readable
+```
+
+### Task status (executed vs pending)
+
+Cross-reference the forms-calendar matrix against regression runs to see which slots have been executed on this customer, which are still pending, and per-TC history:
+
+```bash
+npm run task:status -- --project EmanuelJofre-vv5dev                      # stdout rollup
+npm run task:status -- --project EmanuelJofre-vv5dev --write              # persists to testing/date-handling/forms-calendar/status.md
+npm run task:status -- --project EmanuelJofre-vv5dev --pending-only
+```
 
 ## Repo
 
@@ -58,4 +90,5 @@ Deployable code lives in `repo/` (independent git repo — [emanueljofre/Emanuel
 
 ## Related
 
+- **Test assets catalog: [`test-assets.md`](test-assets.md)** — Date Test Harness form, field map (semantic names), V2 context
 - Sister sandbox on vvdemo: [`../emanueljofre-vvdemo/`](../emanueljofre-vvdemo/CLAUDE.md)

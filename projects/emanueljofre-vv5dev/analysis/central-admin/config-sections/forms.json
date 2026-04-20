@@ -1,0 +1,63 @@
+{
+  "section": "Forms",
+  "heading": "Emanuel Jofre Settings : Forms",
+  "accessedVia": "Settings → Configuration Settings → toolbar dropdown 'Configuration Sections' → 'Forms'",
+  "capturedAt": "2026-04-20",
+  "criticalDateHandlingFlags": {
+    "useUpdatedCalendarControlLogic": false,
+    "convertDateFieldsToCustomerTimezone": false,
+    "preventConversionForDatesIgnoringTimezones": false,
+    "calendarFieldDefaultMask": "",
+    "contradiction": "Central Admin says V2 OFF, but runtime probe (tools/explore/probe-v1-v2-flag.js) reported VV.Form.calendarValueService.useUpdatedCalendarValueLogic=true on a bare template load. setUserInfo() is pushing V2 despite this customer-level toggle being unchecked. Either this checkbox is not the gate, or another platform/database-level override is in effect."
+  },
+  "checkboxes": [
+    { "label": "Refresh the parent window when closing the Form window:", "checked": true },
+    { "label": "Show Workflow Task Completion In Forms:", "checked": true },
+    { "label": "Perform FormField Consistency Check:", "checked": false },
+    { "label": "Use Template Conditions For DataInstances:", "checked": false },
+    { "label": "Use Growth Factor ForText Area When Printing:", "checked": false },
+    { "label": "Editors Can View And Modify Workflow:", "checked": true },
+    { "label": "Allow MultiEdit Form View:", "checked": true },
+    { "label": "Set Multi-Edit Default to True:", "checked": false },
+    { "label": "Try to Parse Data Lookup Values as Numeric:", "checked": true },
+    { "label": "Use Form Database Lookup For Repeating Row Controls:", "checked": true },
+    { "label": "Parse JSON Dropdownlist Values:", "checked": true },
+    { "label": "Use Beta Form Viewer:", "checked": true },
+    { "label": "Use Beta Form Optimizations:", "checked": true },
+    { "label": "Open Form Viewer in New Tab:", "checked": true },
+    { "label": "Form Designer Render Optimization:", "checked": true },
+    { "label": "Convert Date Fields to Customer Timezone:", "checked": false },
+    { "label": "Prevent Conversion For Dates Ignoring Timezones:", "checked": false },
+    { "label": "Allow ID Card Mode:", "checked": false },
+    { "label": "Disable External Script File Caching:", "checked": true },
+    { "label": "Enable Replace Form Revision:", "checked": false },
+    { "label": "Use Updated Calendar Control Logic:", "checked": false },
+    { "label": "Enable Form Signature Security:", "checked": false },
+    { "label": "Use Offline Forms 2.0:", "checked": true }
+  ],
+  "inputs": [
+    { "label": "Form Lock Time Limit:", "value": "20" },
+    { "label": "Form Dashboard Approval Text:", "value": "Allow Workflow Approvals" },
+    { "label": "Form Dashboard Approval Mouseover:", "value": "This allow's any viewer of this report to sign off on completion tasks which are assigned to them." },
+    { "label": "Form Dashboard Approve Link Text:", "value": "Approve" },
+    { "label": "Form Dashboard Approve Link Mouseover:", "value": "Approve the selected items" },
+    { "label": "Add Fields to Data Revisions From Latest Template:", "value": "" },
+    { "label": "Form Dashboard Export Max Row Count:", "value": "2000" },
+    { "label": "Form Designer WCF Request Timeout:", "value": "20" },
+    { "label": "Text Area Growth Factor:", "value": "0" },
+    { "label": "Text Area New Line Factor:", "value": "0" },
+    { "label": "Max Columns Per Reporting Table:", "value": "1000" },
+    { "label": "V4 Form viewer rendering threads:", "value": "0" },
+    { "label": "Calendar Field Default Mask:", "value": "" },
+    { "label": "Offline Expiration:", "value": "10" },
+    { "label": "Message Title for Signature Stamp:", "value": "Authentication Required for Signature" },
+    { "label": "Message Description for Signature Stamp:", "value": "Signature is password protected. Please enter your password." },
+    { "label": "Message Description for Signature Stamp With Username:", "value": "Signature is password protected.  Please enter your user Id and password." }
+  ],
+  "dropdowns": [
+    { "label": "Parent Cascade Default Property:", "selected": "Text" },
+    { "label": "Data Lookup Default Property:", "selected": "Value" },
+    { "label": "Form Designer Responsive Flow:", "selected": "Default" },
+    { "label": "HTML Enabled Multiline Textbox Content Area Mode:", "selected": "Div" }
+  ]
+}

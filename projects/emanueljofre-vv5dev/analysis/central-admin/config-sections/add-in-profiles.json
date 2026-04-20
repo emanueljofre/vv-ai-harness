@@ -1,0 +1,50 @@
+{
+  "section": "Add-In Profile 1/2/3/4",
+  "scope": "customer + database (structurally identical)",
+  "note": "Four parallel integration profile slots. Each slot contains config for multiple third-party integrations: QuickBase, SalesForce, Outlook Add-In. Profiles 1-4 are identical in structure — they're numbered slots for customers who need multiple profile configurations (e.g., different environments or business units). Defaults shown — most fields blank on fresh customers.",
+  "capturedAt": "2026-04-20",
+  "purpose": "Third-party integration configuration (QuickBase, SalesForce, Outlook Add-In)",
+  "checkboxes": [
+    { "label": "Enable Profile:", "checked": false, "scope": "profile-level toggle" },
+    { "label": "Enable Document Library Tab:", "checked": true },
+    { "label": "Require unique file names within a folder:", "checked": true },
+    { "label": "Show Open Button:", "checked": false },
+    { "label": "Show Check-Out Button:", "checked": false },
+    { "label": "Show Check-In Button:", "checked": false },
+    { "label": "Show Check-In as New Button:", "checked": false },
+    { "label": "Show Save Button:", "checked": true },
+    { "label": "Show Save New Button:", "checked": true },
+    { "label": "Enable QuickBase Tab:", "checked": false },
+    { "label": "Auto-Create Dynamic Folder:", "checked": true, "appearsUnder": "QuickBase" },
+    { "label": "Enable Employee Id Filter:", "checked": true },
+    { "label": "Enable SalesForce Tab:", "checked": true },
+    { "label": "Auto-Create Dynamic Folder:", "checked": true, "appearsUnder": "SalesForce" },
+    { "label": "Enable Document Library Tab:", "checked": true, "appearsUnder": "Outlook Add-In" },
+    { "label": "Save Email Messages (Outlook Add-In):", "checked": true }
+  ],
+  "inputFields": {
+    "QuickBase_integration": [
+      "Profile Name", "Profile Group Name", "Default Change Reason", "VisualVault Group Name",
+      "QuickBase API URL", "QuickBase Database Id", "QuickBase User Id", "QuickBase Password",
+      "API Query Value", "API Query Sort Order", "Column Header Names", "Field Ids",
+      "Email Address Field Id", "QuickBase Record Field Id", "QuickBase Record Detail URL",
+      "Document List Title", "Dynamic Folder Path", "Employee Id Query", "Employee Id Label Value",
+      "Client Documents", "Save Button Text", "Search Button Text", "Search Prompt Text", "Rename File Button Text"
+    ],
+    "SalesForce_integration": [
+      "VisualVault Group Name", "SalesForce API URL", "SalesForce API User Id", "SalesForce API Password",
+      "API Timeout in Minutes", "API Query Value", "API Object Type", "API Object Description",
+      "API Query Filter", "Maximum number of search results", "Column Header Names", "Email Address Field Id",
+      "Document List Title", "SalesForce Record Detail URL", "Dynamic Folder Path",
+      "Search Button Text", "Search Prompt Text", "Rename File Button Text"
+    ],
+    "Outlook_AddIn": [
+      "VisualVault Group Name (shared with QB/SF)", "Default folder for attachments", "Email subject template"
+    ]
+  },
+  "behaviorFlagsWorthNoting": [
+    "If `Enable Profile` is off, the whole slot is inert — nothing uses these values",
+    "Each integration section (QuickBase/SalesForce) has its own tab-enable checkbox",
+    "'Auto-Create Dynamic Folder' appears twice (once per integration) — independent per vendor"
+  ]
+}

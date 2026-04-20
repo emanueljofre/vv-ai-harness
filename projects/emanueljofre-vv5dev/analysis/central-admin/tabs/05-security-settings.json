@@ -1,0 +1,26 @@
+{
+  "tab": "Security Settings",
+  "tabParam": "SecuritySettings",
+  "parentTab": "Settings",
+  "sections": ["Password Rules", "Login Rules"],
+  "inputs": [
+    { "id": "txtMinLength", "section": "Password Rules", "label": "Min Length", "type": "text", "value": "0" },
+    { "id": "txtMinAlpha", "section": "Password Rules", "label": "Min Alpha", "type": "text", "value": "0" },
+    { "id": "txtMinDigit", "section": "Password Rules", "label": "Min Digit", "type": "text", "value": "0" },
+    { "id": "txtMinSymbol", "section": "Password Rules", "label": "Min Symbol", "type": "text", "value": "0" },
+    { "id": "txtMaxRepeatingAlpha", "section": "Password Rules", "label": "Max Repeating Alpha", "type": "text", "value": "0" },
+    { "id": "txtMaxRepeatingDigit", "section": "Password Rules", "label": "Max Repeating Digit", "type": "text", "value": "0" },
+    { "id": "txtMaxRepeatingSymbol", "section": "Password Rules", "label": "Max Repeating Symbol", "type": "text", "value": "0" },
+    { "id": "txtMaxSimpleSequence", "section": "Password Rules", "label": "Max Simple Sequence", "type": "text", "value": "0" },
+    { "id": "txtPasswordExpirationDays", "section": "Password Rules", "label": "Password Expiration Days", "type": "text", "value": "365" },
+    { "id": "txtNumberPasswordsToRetain", "section": "Password Rules", "label": "Number of Previous Passwords to Retain", "type": "text", "value": "0" },
+    { "id": "txtMaxLoginAttempts", "section": "Login Rules", "label": "Max Login Attempts", "type": "text", "value": "0" },
+    { "id": "txtLoginAttemptResetMinutes", "section": "Login Rules", "label": "Login Attempt Reset Minutes", "type": "text", "value": "0" },
+    { "id": "txtLockLengthMinutes", "section": "Login Rules", "label": "Lock Length Minutes", "type": "text", "value": "0" }
+  ],
+  "checkboxes": [
+    { "id": "cbRequireMixedAlphaCase", "section": "Password Rules", "label": "Require Both Upper and Lower case characters", "checked": false },
+    { "id": "cbAllowUserData", "section": "Password Rules", "label": "Allow User Data (Username, First Name, Last Name)", "checked": false },
+    { "id": "chkPasswordNeverExpiresDefault", "section": "Password Rules", "label": "Passsword never expires default value when creating user accounts", "checked": false }
+  ]
+}

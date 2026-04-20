@@ -1,0 +1,18 @@
+{
+  "tab": "Users",
+  "tabParam": "Users",
+  "sections": [],
+  "dropdowns": [
+    { "id": "ddlUserStatus", "label": "User Status filter", "selected": "Enabled Accounts", "optionCount": 3, "note": "Options: Enabled, Disabled, All (inferred from count)" },
+    { "id": "ddlOnlineOnly", "label": "Online filter", "selected": "All Accounts", "optionCount": 2 }
+  ],
+  "grids": [
+    {
+      "id": "radGridUsers",
+      "headers": ["User ID", "First Name", "Last Name", "Email"],
+      "rowCount": 3,
+      "note": "User list for this customer — exact rows not captured (PII avoidance)"
+    }
+  ],
+  "buttons": []
+}

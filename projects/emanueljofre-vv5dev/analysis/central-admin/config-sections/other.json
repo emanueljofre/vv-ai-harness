@@ -1,0 +1,47 @@
+{
+  "section": "Other",
+  "scope": "customer + database",
+  "heading": "Emanuel Jofre: Main Settings : Other",
+  "note": "Catch-all: Scripting Server (points to harness), eFax/vFax, Reporting, SNS messaging, VVConnect, GitHub version control, dashboard palette.",
+  "capturedAt": "2026-04-20",
+  "highImpactForThisRepo": {
+    "Scripting Server Url": "https://nodejs-preprod.visualvault.com",
+    "note": "This is the VV-side URL for the harness Express server. Script endpoints (Microservices → `/scripts`/`/scheduledscripts`) hit this base. For local dev, the vvdemo route goes through ngrok; vv5dev routes here."
+  },
+  "inputs": [
+    { "label": "Dashboard Color Palette:", "value": "" },
+    { "label": "eFax Username:", "value": "vv5dev.config" },
+    { "label": "eFax Password:", "value": "[REDACTED]" },
+    { "label": "eFax Account ID:", "value": "" },
+    { "label": "eFax Drop Folder:", "value": "" },
+    { "label": "vFax URL:", "value": "http://localhost/VFax/SendZetaFax" },
+    { "label": "vFax Status URL:", "value": "http://localhost/VFax/ZetaFaxLog" },
+    { "label": "Report Server URL:", "value": "http://localhost/Reporting/" },
+    { "label": "Scripting Server Url:", "value": "https://nodejs-preprod.visualvault.com" },
+    { "label": "SNS Origination Number:", "value": "" },
+    { "label": "SNS Region Name:", "value": "US-East-1" },
+    { "label": "SNS API Key:", "value": "[REDACTED]" },
+    { "label": "Doc Viewer Form Fields:", "value": "Status,Patient Last Name,Patient First Name,DOS,Physician Name,Practice,Coder" },
+    { "label": "Utilization Dashboard:", "value": "PreProd-Utilization" },
+    { "label": "Custom Utilization Session Filter:", "value": "" },
+    { "label": "VVConnect Websocket Api Gateway:", "value": "" },
+    { "label": "VVConnect Region Name:", "value": "US-East-1" },
+    { "label": "VVConnect Api Key:", "value": "[REDACTED]" },
+    { "label": "VVConnect Api Secret:", "value": "[REDACTED]" },
+    { "label": "GitHub Repository Owner:", "value": "" },
+    { "label": "GitHub Repository:", "value": "" },
+    { "label": "GitHub Branch:", "value": "" },
+    { "label": "GitHub Access Token:", "value": "[REDACTED]" }
+  ],
+  "checkboxes": [
+    { "label": "Is Sandbox Server:", "checked": false },
+    { "label": "Enable Server Scripting:", "checked": true },
+    { "label": "Enable API Utilization Tracking:", "checked": true },
+    { "label": "VVConnect Notifications Enable:", "checked": false },
+    { "label": "Enable Data Warehouse Reporting:", "checked": true },
+    { "label": "Enable GitHub Version Control:", "checked": false }
+  ],
+  "dropdowns": [
+    { "label": "Outbound Fax:", "selected": "None" }
+  ]
+}

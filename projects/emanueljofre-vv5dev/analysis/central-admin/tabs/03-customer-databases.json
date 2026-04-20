@@ -1,0 +1,21 @@
+{
+  "tab": "Databases",
+  "tabParam": "CustomerDatabases",
+  "sections": ["Customer Databases"],
+  "grids": [
+    {
+      "id": "radGridCustomerDatabases",
+      "headers": ["Is Active", "Name", "Description", "Database Version", "Server Name", "Database Name", "Form Database Name"],
+      "rows": [
+        {
+          "Name": "Main",
+          "Description": "Main",
+          "Database Version": "v3041",
+          "Server Name": "use1d-vvdevsql1",
+          "Database Name": "vv5dev_EmanuelJofre_Main",
+          "Form Database Name": "vv5dev_EmanuelJofre_Main_FormData"
+        }
+      ]
+    }
+  ]
+}
