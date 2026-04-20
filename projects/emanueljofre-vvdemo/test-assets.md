@@ -76,3 +76,4 @@ The `response.json()` message appears in the VV Scheduled Service Log for **both
 
 - **Playwright integration**: `testing/fixtures/vv-config.js` exports `FORM_TEMPLATE_URL`, `TARGET_FORM_TEMPLATE_URL`, `FIELD_MAP`, `SAVED_RECORDS`, and `RECORD_DEFINITIONS` for programmatic test use.
 - **TargetDateTest** shares the same `xcid`/`xcdid` revision GUIDs as DateTest — they're sibling revisions of the same field layout.
+- **Cat 13 DB-storage spec** (`testing/specs/date-handling/cat-13-db-storage.spec.js`) creates fresh `DateTest-*` records per run via both REST `postForms` and browser saves, then reads back via `getForms`. Tests never assert on pre-existing fixture records. Safe on this env (unrestricted write policy).
