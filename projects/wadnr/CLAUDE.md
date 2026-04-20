@@ -32,6 +32,7 @@ Last full extraction: 2026-04-08.
 - `analysis/field-inventory.md` — 137 calendar fields across 35 templates, mapped to date bug exposure (Config A-H)
 - `analysis/script-inventory.md` — Script-level date field interactions, WS calls, global function usage
 - `analysis/bug-analysis/case-study-124697.md` — Freshdesk #124697 (Jira WADNR-10407): postForms time mutation confirms FORM-BUG-5 cross-layer. Near-production constraint — no changes to DNR environment.
+- `analysis/bug-analysis/form-bug-1-support-report.md` — Support-format ticket draft for FORM-BUG-1 (calendar fields display and save the wrong date/time on form open). Three parallel reproductions (template `Initial Value`, API-written value, URL parameter), per-timezone concrete values, shift-calculation formula.
 - `analysis/date-handling-current-state.md` — WADNR-scoped current-state report: 11-layer catalogue, per-config scenario walkthroughs (B/C/D × 11 scenarios × PST/EST/UTC), XLAYER matrix, PST-weighted risk register, assumptions section.
 - `analysis/date-handling-briefing.md` — Manager-facing briefing derived from the current-state report. Plain-language framing, three defect classes, mitigation + escalation asks.
 - `analysis/fillin-and-relate-form-audit.md` — A1: code audit of the site-level `FillinAndRelateForm` global and its callers. Verdict: no live FORM-BUG-5 exposure via this chain on WADNR today.
@@ -101,7 +102,7 @@ Runner requires `--template-name "zzzDate Test Harness"` (form name differs from
 
 ### Forms Calendar
 
-116 PASS / 0 FAIL — BRT-Chromium (2026-04-10) for Cat 1-12. Cross-environment differential (Cat 14-16) completed 2026-04-13: Cat 14 Phase A 13 tests (8P/5F-3 Bug #5), Cat 15 Kendo comparison 8 PASS (v1≈v2, corrected assumptions), Cat 16 Server TZ 6 PASS (identical across envs). Cat 10 (Web Service Input): 6 Config D scenarios re-verified 2026-04-13 — all match EmanuelJofre baseline. See `testing/date-handling/forms-calendar/runs/cat10-wadnr-run-1.md`. See `testing/date-handling/forms-calendar/status.md`.
+116 PASS / 0 FAIL — BRT-Chromium (2026-04-10) for Cat 1-12. Cross-environment differential (Cat 14-16) completed 2026-04-13: Cat 14 Phase A 13 tests (8P/5F-3 Bug #5), Cat 15 Kendo comparison 8 PASS (v1≈v2, corrected assumptions), Cat 16 Server TZ 6 PASS (identical across envs). Cat 10 (Web Service Input): 6 Config D scenarios re-verified 2026-04-13 — all match EmanuelJofre baseline. **FORM-BUG-1 re-verified 2026-04-20** via a 4-spec subset on fresh saved records (45P/6F/33 skipped) — confirms the bug still reproduces across API, preset `Initial Value`, and URL-parameter input vectors on vv5dev. See `testing/date-handling/forms-calendar/runs/cat10-wadnr-run-1.md` and `.../runs/bug1-verification-2026-04-20.md`. See `testing/date-handling/forms-calendar/status.md`.
 
 ## Related
 
