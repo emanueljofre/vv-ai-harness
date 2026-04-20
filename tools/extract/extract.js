@@ -22,6 +22,8 @@ const fs = require('fs');
 const path = require('path');
 const vvAdmin = require('../helpers/vv-admin');
 const vvSync = require('../helpers/vv-sync');
+const { captureBuildContext } = require('../helpers/build-context');
+const { fingerprint } = require('../helpers/build-fingerprint');
 
 // --- Available components ---
 
@@ -133,9 +135,20 @@ async function main() {
         console.log('Logged in.\n');
         await loginPage.close();
 
+        // Capture build context once per run — stamped into every component's manifest
+        // so downstream tools can correlate this extract with the platform build.
+        const buildContext = await captureBuildContext(config).catch(() => null);
+        if (buildContext) {
+            buildContext.fingerprint = fingerprint(buildContext);
+            console.log(
+                `Platform build: ${buildContext.fingerprint} — ${buildContext.progVersion} · FV ${buildContext.formViewerBuild}\n`
+            );
+        }
+
         // Shared context for cross-component routing
         const extractContext = {
             scheduledScriptsDir: path.join(BASE_OUTPUT, 'schedules', 'scripts'),
+            buildContext,
         };
 
         // Run each component
@@ -283,6 +296,7 @@ async function runComponent(comp, page, config, outputDir, extractContext, conte
             environment: `${PROJECT.server}/${PROJECT.customer}`,
             component: comp.name,
             items: allItems,
+            buildContext: extractContext.buildContext,
         });
 
         // Generate README with full set of extracted files

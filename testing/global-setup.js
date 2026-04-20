@@ -128,8 +128,9 @@ async function createRecords() {
  * Saved to testing/config/build-context.json — read by regression reporter.
  */
 async function captureBuild() {
-    if (isCacheFresh(BUILD_CONTEXT_PATH)) return;
-
+    // Always re-capture on every run — do NOT cache. A stale build context defeats
+    // the purpose of the fingerprint (used to correlate runs with platform rollouts).
+    // HTTP cost is ~2s, trivial on a multi-minute regression run.
     try {
         const ctx = await captureBuildContext(vvConfig);
         fs.writeFileSync(BUILD_CONTEXT_PATH, JSON.stringify(ctx, null, 2));

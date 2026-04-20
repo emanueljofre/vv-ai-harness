@@ -18,6 +18,8 @@
 const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+const { captureBuildContext } = require('../../tools/helpers/build-context');
+const { fingerprint } = require('../../tools/helpers/build-fingerprint');
 
 const REPO_ROOT = path.resolve(__dirname, '..', '..');
 const RUNNER_PATH = path.join(REPO_ROOT, 'tools', 'runners', 'run-ws-test.js');
@@ -111,7 +113,7 @@ const TEST_INVOCATIONS = [
     { action: 'WS-9', tz: 'UTC', configs: 'A', inputDate: '2026-03-15', extraArgs: '' },
 ];
 
-function main() {
+async function main() {
     const args = process.argv.slice(2);
     const artifactsOnly = args.includes('--artifacts-only');
     const skipArtifacts = args.includes('--skip-artifacts');
@@ -234,9 +236,14 @@ function main() {
             }
         }
 
+        // Capture build context so the timeline tool can correlate this run with a platform build
+        const buildContext = await captureBuildContext().catch(() => null);
+        if (buildContext) buildContext.fingerprint = fingerprint(buildContext);
+
         // Save results
         const output = {
             timestamp: new Date().toISOString(),
+            buildContext,
             summary: {
                 total: allResults.length,
                 executed: allResults.filter((r) => r.status === 'executed').length,

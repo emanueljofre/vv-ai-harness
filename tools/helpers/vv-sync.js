@@ -44,13 +44,16 @@ function loadManifest(manifestPath) {
 /**
  * Save a manifest.json to disk.
  * @param {string} manifestPath
- * @param {object} opts - { environment, component, items }
+ * @param {object} opts - { environment, component, items, buildContext }
+ *   - buildContext: optional build-fingerprint record so downstream tools can
+ *     correlate this extract with the platform build it was captured against.
  */
-function saveManifest(manifestPath, { environment, component, items }) {
+function saveManifest(manifestPath, { environment, component, items, buildContext }) {
     const manifest = {
         generatedAt: new Date().toISOString(),
         environment,
         component,
+        buildContext: buildContext || null,
         totalItems: items.length,
         [component]: items,
     };

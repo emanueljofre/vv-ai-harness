@@ -4,30 +4,32 @@ Complete technical reference for all CLI tools in `tools/`. For folder-level ove
 
 ## Quick Reference
 
-| Script                                                 | npm alias          | Category  | Purpose                                   | Scope           | Writes    |
-| ------------------------------------------------------ | ------------------ | --------- | ----------------------------------------- | --------------- | --------- |
-| [extract.js](#extractjs)                               | —                  | Extract   | Unified extraction of VV admin components | project         | disk-only |
-| [version-snapshot.js](#version-snapshotjs)             | `version:snapshot` | Explore   | Capture platform version state            | environment     | disk-only |
-| [version-diff.js](#version-diffjs)                     | `version:diff`     | Explore   | Compare two version snapshots             | general         | read-only |
-| [environment-profile.js](#environment-profilejs)       | `env:profile`      | Explore   | Generate environment metadata profile     | project         | disk-only |
-| [review-forms.js](#review-formsjs)                     | `review:forms`     | Review    | Standards review of form template XMLs    | project         | disk-only |
-| [inventory-fields.js](#inventory-tools)                | —                  | Inventory | Calendar field config analysis            | project (WADNR) | disk-only |
-| [inventory-scripts.js](#inventory-tools)               | —                  | Inventory | Inline script interaction analysis        | project (WADNR) | disk-only |
-| [run-ws-test.js](#run-ws-testjs)                       | —                  | Runner    | WS test harness (direct Node.js)          | environment     | to-VV     |
-| [run-sp-test.js](#run-sp-testjs)                       | —                  | Runner    | SP test harness (direct Node.js)          | environment     | to-VV     |
-| [run-relate-test.js](#run-relate-testjs)               | —                  | Runner    | Relate/unrelate API round-trip            | environment     | to-VV     |
-| [create-ws.js](#create-wsjs)                           | —                  | Admin     | Create web service via admin UI           | project         | to-VV     |
-| [create-schedule.js](#admin-tools--compact-entries)    | —                  | Admin     | Create scheduled service via admin UI     | project         | to-VV     |
-| [test-schedule.js](#admin-tools--compact-entries)      | —                  | Admin     | Test scheduled service end-to-end         | project         | to-VV     |
-| [verify-ws.js](#admin-tools--compact-entries)          | —                  | Admin     | Verify web service existence via API      | project         | read-only |
-| [explore-admin.js](#admin-tools--compact-entries)      | —                  | Admin     | Discover admin page structure             | project         | read-only |
-| [audit-bug2–bug7](#audit--verification-tools)          | —                  | Audit     | Bug evidence collection (7 scripts)       | environment     | varies    |
-| [explore-dashboard.js](#verification--probe-scripts)   | —                  | Audit     | Dashboard grid inspection                 | environment     | read-only |
-| [verify-ws\*-browser.js](#verification--probe-scripts) | —                  | Audit     | Browser-based WS verification             | environment     | read-only |
-| [probe-\*.js (SP)](#scheduled-process-probes)          | —                  | Explore   | SP research investigation (8 scripts)     | environment     | varies    |
-| [generate-artifacts.js](#generator-tools)              | —                  | Generator | Forms regression → markdown artifacts     | general         | disk-only |
-| [generate-ws-artifacts.js](#generator-tools)           | —                  | Generator | WS regression → markdown artifacts        | general         | disk-only |
-| [generate-dash-artifacts.js](#generator-tools)         | —                  | Generator | Dashboard regression → markdown artifacts | general         | disk-only |
+| Script                                                 | npm alias          | Category  | Purpose                                      | Scope           | Writes                     |
+| ------------------------------------------------------ | ------------------ | --------- | -------------------------------------------- | --------------- | -------------------------- |
+| [extract.js](#extractjs)                               | —                  | Extract   | Unified extraction of VV admin components    | project         | disk-only                  |
+| [version-snapshot.js](#version-snapshotjs)             | `version:snapshot` | Explore   | Capture platform version state               | environment     | disk-only                  |
+| [version-diff.js](#version-diffjs)                     | `version:diff`     | Explore   | Compare two version snapshots                | general         | read-only                  |
+| [environment-profile.js](#environment-profilejs)       | `env:profile`      | Explore   | Generate environment metadata profile        | project         | disk-only                  |
+| [build-timeline.js](#build-timelinejs)                 | `build:timeline`   | Analysis  | Derived view of platform builds observed     | project         | read-only                  |
+| [task-status.js](#task-statusjs)                       | `task:status`      | Analysis  | Matrix slots executed vs pending per project | project         | disk-only (with `--write`) |
+| [review-forms.js](#review-formsjs)                     | `review:forms`     | Review    | Standards review of form template XMLs       | project         | disk-only                  |
+| [inventory-fields.js](#inventory-tools)                | —                  | Inventory | Calendar field config analysis               | project (WADNR) | disk-only                  |
+| [inventory-scripts.js](#inventory-tools)               | —                  | Inventory | Inline script interaction analysis           | project (WADNR) | disk-only                  |
+| [run-ws-test.js](#run-ws-testjs)                       | —                  | Runner    | WS test harness (direct Node.js)             | environment     | to-VV                      |
+| [run-sp-test.js](#run-sp-testjs)                       | —                  | Runner    | SP test harness (direct Node.js)             | environment     | to-VV                      |
+| [run-relate-test.js](#run-relate-testjs)               | —                  | Runner    | Relate/unrelate API round-trip               | environment     | to-VV                      |
+| [create-ws.js](#create-wsjs)                           | —                  | Admin     | Create web service via admin UI              | project         | to-VV                      |
+| [create-schedule.js](#admin-tools--compact-entries)    | —                  | Admin     | Create scheduled service via admin UI        | project         | to-VV                      |
+| [test-schedule.js](#admin-tools--compact-entries)      | —                  | Admin     | Test scheduled service end-to-end            | project         | to-VV                      |
+| [verify-ws.js](#admin-tools--compact-entries)          | —                  | Admin     | Verify web service existence via API         | project         | read-only                  |
+| [explore-admin.js](#admin-tools--compact-entries)      | —                  | Admin     | Discover admin page structure                | project         | read-only                  |
+| [audit-bug2–bug7](#audit--verification-tools)          | —                  | Audit     | Bug evidence collection (7 scripts)          | environment     | varies                     |
+| [explore-dashboard.js](#verification--probe-scripts)   | —                  | Audit     | Dashboard grid inspection                    | environment     | read-only                  |
+| [verify-ws\*-browser.js](#verification--probe-scripts) | —                  | Audit     | Browser-based WS verification                | environment     | read-only                  |
+| [probe-\*.js (SP)](#scheduled-process-probes)          | —                  | Explore   | SP research investigation (8 scripts)        | environment     | varies                     |
+| [generate-artifacts.js](#generator-tools)              | —                  | Generator | Forms regression → markdown artifacts        | general         | disk-only                  |
+| [generate-ws-artifacts.js](#generator-tools)           | —                  | Generator | WS regression → markdown artifacts           | general         | disk-only                  |
+| [generate-dash-artifacts.js](#generator-tools)         | —                  | Generator | Dashboard regression → markdown artifacts    | general         | disk-only                  |
 
 ## Scope & Write Behavior Key
 
@@ -192,6 +194,30 @@ npm run env:profile:browser
 **Output:** `projects/{customer}/environment.json`
 
 **Dependencies:** `.env.json` credentials. Browser probes need Playwright.
+
+### probe-v1-v2-flag.js
+
+**Purpose:** Report whether a VV environment is running the V1 or V2 calendar-value code path (`VV.Form.calendarValueService.useUpdatedCalendarValueLogic`).
+**Scope:** cross-env | **Write:** none (read-only form load)
+**Path:** `tools/explore/probe-v1-v2-flag.js`
+
+```bash
+node tools/explore/probe-v1-v2-flag.js --project EmanuelJofre-vv5dev
+```
+
+Opens the first available form template via the REST API, loads it in FormViewer, evaluates the flag. If the flag is `true` without `?ObjectID=` in the URL and `modelId` empty, it's being pushed by `setUserInfo()` — i.e., the customer-or-database-scope **"Use Updated Calendar Control Logic"** toggle is enabled. DB scope overrides customer scope; see [Central Admin § Forms](../architecture/visualvault-platform.md#configuration-sections-toolbar).
+
+### probe-central-admin.js
+
+**Purpose:** Walk the `/ca/ConfigureCustomerDetails` tabs and capture per-tab settings to JSON.
+**Scope:** cross-env | **Write:** none (clicks tabs only, never Save)
+**Path:** `tools/explore/probe-central-admin.js`
+
+```bash
+node tools/explore/probe-central-admin.js --project EmanuelJofre-vv5dev --customerid <guid>
+```
+
+**Requires a Central Admin-privileged account** (regular API users are bounced at `/ca/centraladmin`). Service accounts like `apivv5` cannot pass the gate. For environments where Playwright auth can't reach CA, use the Claude-in-Chrome extension with a manually-authenticated session. Outputs to `projects/{project}/analysis/central-admin/` — `index.json`, per-tab JSON + HTML.
 
 ### Scheduled Process Probes
 
@@ -523,20 +549,64 @@ Create/update markdown test artifacts from regression pipeline results. All shar
 
 ---
 
+## 8b. Analysis Tools
+
+### build-timeline.js
+
+**Purpose:** Derive a chronological view of platform builds observed in a project, grouping artifacts by build fingerprint.
+**Scope:** project | **Write:** read-only (prints to stdout)
+**npm alias:** `npm run build:timeline`
+**Path:** `tools/analysis/build-timeline.js`
+
+```bash
+npm run build:timeline -- --project EmanuelJofre-vv5dev
+npm run build:timeline -- --project EmanuelJofre-vv5dev --tc TC-1-D-BRT   # per-TC history across builds
+npm run build:timeline -- --project EmanuelJofre-vv5dev --json            # machine-readable
+```
+
+Walks `projects/{name}/**/*.json` and picks up any artifact with an embedded `buildContext` — regression results, environment profiles, extract manifests. Groups by SHA-8 fingerprint (over `environment + progVersion + dbVersion + formViewerBuild`), sorts by timestamp, and prints first/last-seen windows per build plus the observations that anchored each entry.
+
+No separate state file is maintained — the timeline is a **view** over existing artifacts. Delete an artifact, you lose that observation. Used to correlate test-behavior changes with platform rollouts: when a fingerprint flips, compare per-TC status across the two builds.
+
+Consumers: any run that writes a JSON with `buildContext` contributes automatically. The `buildContext.fingerprint` field is computed by `build-fingerprint.js`.
+
+### task-status.js
+
+**Purpose:** Cross-reference matrix-defined slots vs regression runs to produce an executed-vs-pending rollup per customer.
+**Scope:** project | **Write:** read-only to stdout, `--write` persists `status.md` to the project
+**npm alias:** `npm run task:status`
+**Path:** `tools/analysis/task-status.js`
+
+```bash
+npm run task:status -- --project EmanuelJofre-vv5dev
+npm run task:status -- --project EmanuelJofre-vv5dev --write          # persist to projects/{name}/testing/date-handling/forms-calendar/status.md
+npm run task:status -- --project EmanuelJofre-vv5dev --pending-only
+npm run task:status -- --project EmanuelJofre-vv5dev --json
+```
+
+Parses TC IDs from `research/date-handling/{component}/matrix.md`, walks `projects/{project}/**/*.json` for regression results, diffs the two to classify each slot as: **executed** (at least one non-skipped run — with last status, run count, fingerprint, project, last actualRaw), **pending** (in matrix, never executed on this customer), or **extra** (executed but not in matrix — usually an ID-format mismatch or newly-added spec).
+
+Covers all six date-handling components (`forms-calendar`, `web-services`, `dashboards`, `document-library`, `workflows`, `scheduled-processes`). Omit `--component` to get a cross-component rollup + per-component breakdown; pass `--component <name>` to limit scope. Each component has its own matrix ID format (`1-A-BRT`, `ws-1-*`, `db-5-exact`, `doc-1-iso-date`, `wf-1-brt-midday`, `sp-2-now-brt`) — all normalized to lowercase for matching.
+
+**Requires the regression-reporter to know about the component's ID prefix** — `regression-reporter.js` extracts `TC-*:` (forms), `DB-*:`/`DOC-*:`/`WF-*:`/`SP-*:`/`WS-*:` category titles, and lowercase fine-grained slot IDs from test titles. Tests whose titles don't carry a recognizable slot ID are not tracked by this tool.
+
+Pairs with `build-timeline.js`: timeline tells you _which builds ran when_; task-status tells you _which slots have been covered and what they looked like_. Together they answer "did TC-X regress on build Y?".
+
 ## 9. Helper Modules
 
 Library modules in `tools/helpers/` — consumed by tools, not invoked directly.
 
-| Module                   | Purpose                                                            | Key Exports                                                                                                                                                                                       | Primary Consumers                           |
-| ------------------------ | ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------- |
-| **vv-admin.js**          | Admin page automation — login, RadGrid scraping, ASP.NET postbacks | `findCustomer`, `listCustomers`, `getActiveCustomer`, `loadEnvConfig`, `login`, `adminUrl`, `triggerPostback`, `getGridDetailLinks`, `goToNextGridPage`, `extractDockPanelDetail`, `readGridRows` | extract.js, admin/\* tools, explore probes  |
-| **vv-probes.js**         | HTTP-only platform discovery — no browser needed                   | `getToken`, `captureApiVersion`, `captureConfigEndpoints`, `captureServerHeaders`, `captureFormViewerBuild`, `captureFormViewerConfig`, `captureFormsApiInfo`, `captureApiMeta`                   | version-snapshot.js, environment-profile.js |
-| **vv-browser-probes.js** | Browser-based front-end stack detection                            | `captureAdminApp`, `captureFormViewerApp`, `runBrowserProbes`                                                                                                                                     | environment-profile.js (`--with-browser`)   |
-| **vv-sync.js**           | Manifest-based incremental sync for extractions                    | `sanitizeFilename`, `matchesFilter`, `loadManifest`, `saveManifest`, `computeChanges`, `generateReadme`                                                                                           | extract.js, extract components              |
-| **vv-explore.js**        | Exploration spec utilities — response collection, DOM/JS scanning  | `createResponseCollector`, `enumerateJSGlobals`, `scanDOM`, `probeEndpoints`, `formatReport`                                                                                                      | explore specs                               |
-| **build-context.js**     | Platform build metadata capture (~2s, HTTP only)                   | `captureBuildContext`                                                                                                                                                                             | testing global-setup, regression pipelines  |
-| **ws-api.js**            | REST API CRUD helpers for date-handling tests                      | `authenticate`, `createFormInstance`, `getFormInstance`, `queryFormInstances`, `updateFormInstance`, `apiRoundTripCycle`                                                                          | WS test specs                               |
-| **ws-log.js**            | Log shim for running scripts outside the server tree               | Proxies to `lib/.../log`                                                                                                                                                                          | Server-side script runners                  |
+| Module                   | Purpose                                                            | Key Exports                                                                                                                                                                                       | Primary Consumers                                             |
+| ------------------------ | ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| **vv-admin.js**          | Admin page automation — login, RadGrid scraping, ASP.NET postbacks | `findCustomer`, `listCustomers`, `getActiveCustomer`, `loadEnvConfig`, `login`, `adminUrl`, `triggerPostback`, `getGridDetailLinks`, `goToNextGridPage`, `extractDockPanelDetail`, `readGridRows` | extract.js, admin/\* tools, explore probes                    |
+| **vv-probes.js**         | HTTP-only platform discovery — no browser needed                   | `getToken`, `captureApiVersion`, `captureConfigEndpoints`, `captureServerHeaders`, `captureFormViewerBuild`, `captureFormViewerConfig`, `captureFormsApiInfo`, `captureApiMeta`                   | version-snapshot.js, environment-profile.js                   |
+| **vv-browser-probes.js** | Browser-based front-end stack detection                            | `captureAdminApp`, `captureFormViewerApp`, `runBrowserProbes`                                                                                                                                     | environment-profile.js (`--with-browser`)                     |
+| **vv-sync.js**           | Manifest-based incremental sync for extractions                    | `sanitizeFilename`, `matchesFilter`, `loadManifest`, `saveManifest`, `computeChanges`, `generateReadme`                                                                                           | extract.js, extract components                                |
+| **vv-explore.js**        | Exploration spec utilities — response collection, DOM/JS scanning  | `createResponseCollector`, `enumerateJSGlobals`, `scanDOM`, `probeEndpoints`, `formatReport`                                                                                                      | explore specs                                                 |
+| **build-context.js**     | Platform build metadata capture (~2s, HTTP only)                   | `captureBuildContext`                                                                                                                                                                             | testing global-setup, regression pipelines                    |
+| **build-fingerprint.js** | SHA-8 fingerprint over behavior-relevant build fields              | `fingerprint`, `extractFields`, `FINGERPRINT_FIELDS`                                                                                                                                              | regression-reporter, extract.js, pipelines, build-timeline.js |
+| **ws-api.js**            | REST API CRUD helpers for date-handling tests                      | `authenticate`, `createFormInstance`, `getFormInstance`, `queryFormInstances`, `updateFormInstance`, `apiRoundTripCycle`                                                                          | WS test specs                                                 |
+| **ws-log.js**            | Log shim for running scripts outside the server tree               | Proxies to `lib/.../log`                                                                                                                                                                          | Server-side script runners                                    |
 
 ---
 

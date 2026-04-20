@@ -13,6 +13,7 @@
  */
 const fs = require('fs');
 const path = require('path');
+const { fingerprint } = require('../../tools/helpers/build-fingerprint');
 
 const BUILD_CONTEXT_PATH = path.join(__dirname, '..', 'config', 'build-context.json');
 
@@ -32,6 +33,9 @@ class RegressionReporter {
         try {
             if (fs.existsSync(BUILD_CONTEXT_PATH)) {
                 this.buildContext = JSON.parse(fs.readFileSync(BUILD_CONTEXT_PATH, 'utf8'));
+                // Attach a short fingerprint derived from behavior-relevant fields
+                // so this run can be correlated with other runs/extracts on the same build.
+                this.buildContext.fingerprint = fingerprint(this.buildContext);
             }
         } catch {
             // Non-fatal — report works without build context
@@ -112,17 +116,37 @@ class RegressionReporter {
     }
 
     /**
-     * Extract TC ID from the test's describe chain.
-     * Pattern: "TC-{id}: ..." in the parent describe block.
+     * Extract a slot ID from the test's describe chain + own title.
+     *
+     * Supported patterns (checked in order — finer-grained wins):
+     *   1. Fine-grained slot in test title:           db-5-exact: ..., doc-1-iso-date: ..., wf-1-brt-midday: ..., sp-2-now-brt: ..., ws-1-...
+     *   2. Forms TC ID (walk up parent chain):        TC-1-A-BRT: ..., TC-12-empty-value: ...
+     *   3. Category-level ID (walk up parent chain):  DB-5: ..., DOC-1: ..., WF-2: ..., SP-3: ..., WS-4: ...
+     *
+     * Returns the matched slot ID (lowercased for consistency with matrix IDs where applicable).
      */
     _extractTcId(test) {
+        // (1) Fine-grained slot in the leaf test title (preferred — most specific)
+        const fineGrained = test.title?.match(/^((?:db|doc|wf|sp|ws)-\d+[A-Za-z0-9-]*):/i);
+        if (fineGrained) return fineGrained[1].toLowerCase();
+
+        // (2) Forms TC ID walking up the parent chain
         let current = test.parent;
         while (current) {
-            const match = current.title?.match(/^TC-(.+?):/);
-            if (match) return match[1];
+            const m = current.title?.match(/^TC-(.+?):/);
+            if (m) return m[1];
             current = current.parent;
         }
-        // Fallback: check test title itself
+
+        // (3) Category-level ID (DB-*, DOC-*, WF-*, SP-*, WS-*) walking up the parent chain
+        current = test.parent;
+        while (current) {
+            const cat = current.title?.match(/^((?:DB|DOC|WF|SP|WS)-\d+[A-Za-z0-9-]*):/);
+            if (cat) return cat[1];
+            current = current.parent;
+        }
+
+        // (4) Fallback: forms TC ID embedded in the leaf title itself
         const titleMatch = test.title?.match(/TC-(.+?)[\s:]/);
         return titleMatch ? titleMatch[1] : null;
     }

@@ -20,6 +20,8 @@
 const { chromium } = require('@playwright/test');
 const fs = require('fs');
 const path = require('path');
+const { captureBuildContext } = require('../../tools/helpers/build-context');
+const { fingerprint } = require('../../tools/helpers/build-fingerprint');
 
 const REPO_ROOT = path.resolve(__dirname, '..', '..');
 const AUTH_STATE_PATH = path.join(REPO_ROOT, 'testing', 'config', 'auth-state-pw.json');
@@ -126,9 +128,14 @@ async function main() {
         await context.close();
         await browser.close();
 
+        // Capture build context so the timeline tool can correlate this run with a platform build
+        const buildContext = await captureBuildContext().catch(() => null);
+        if (buildContext) buildContext.fingerprint = fingerprint(buildContext);
+
         // Save results
         const output = {
             timestamp: new Date().toISOString(),
+            buildContext,
             pager: pagerInfo,
             totalRows: gridData.totalRows,
             totalResults: results.length,
