@@ -278,8 +278,12 @@ async function selectDateInDateTimePicker(page, year, month, day) {
  * @param {import('@playwright/test').Page} page
  * @param {string} fieldName - e.g., "Field7"
  * @param {string} dateStr - formatted date string with segments separated by / : or space
+ * @param {Object} [options]
+ * @param {boolean} [options.waitForValue=true] - poll for raw value after blur. Set to false
+ *   when the input is expected to fail parsing (Kendo rejects the string and the field stays
+ *   empty), e.g. Cat-18 culture-mismatch inputs. Without this, the 5s poll times out.
  */
-async function typeDateInField(page, fieldName, dateStr) {
+async function typeDateInField(page, fieldName, dateStr, { waitForValue = true } = {}) {
     const fieldContainer = page.locator(`[aria-label="${fieldName}"]`);
     await fieldContainer.scrollIntoViewIfNeeded();
     // Legacy fields (useLegacy=true) render as a plain <input aria-label="FieldN"> inside div.d-picker.
@@ -319,16 +323,18 @@ async function typeDateInField(page, fieldName, dateStr) {
         await page.keyboard.press('Tab');
     }
 
-    // Wait for the field's value to be processed by VV instead of using an arbitrary timeout.
-    // VV processes the value on blur — poll until the raw value is set.
-    await page.waitForFunction(
-        (name) => {
-            const val = VV.Form.VV.FormPartition.getValueObjectValue(name);
-            return val !== null && val !== undefined && val !== '';
-        },
-        fieldName,
-        { timeout: 5000 }
-    );
+    if (waitForValue) {
+        // Wait for the field's value to be processed by VV instead of using an arbitrary timeout.
+        // VV processes the value on blur — poll until the raw value is set.
+        await page.waitForFunction(
+            (name) => {
+                const val = VV.Form.VV.FormPartition.getValueObjectValue(name);
+                return val !== null && val !== undefined && val !== '';
+            },
+            fieldName,
+            { timeout: 5000 }
+        );
+    }
 }
 
 /**
