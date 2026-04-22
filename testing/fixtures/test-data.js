@@ -10862,6 +10862,34 @@ const TEST_DATA = [
         notes: "Invalid under any Culture — Feb 31 doesn't exist, field stays empty.",
         tcRef: null,
     },
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // Category 20 — Multi-User Concurrency (POC)
+    //
+    // Only one Cat-20 slot seeded today as a proof-of-concept for the
+    // multi-context orchestration pattern. Remaining 12 slots are queued in
+    // the matrix (race / stale / pipeline / helpdesk / timed). Each requires
+    // 2+ browser contexts with distinct timezoneId + auth state; the spec
+    // spawns these itself rather than relying on the TZ-project matrix.
+    //
+    // See cat-20-concurrency.spec.js + forms-calendar/matrix.md § 20.
+    // ═══════════════════════════════════════════════════════════════════════
+    {
+        id: '20-race-same-tz-BRT',
+        category: 20,
+        categoryName: 'Multi-User Concurrency',
+        scope: 'V2',
+        config: 'D',
+        tz: 'BRT',
+        tzOffset: 'GMT-0300',
+        scenario: 'race-same-tz',
+        initialInput: '03/01/2026 10:00',
+        userAInput: '03/15/2026 14:00',
+        userBInput: '03/20/2026 18:00',
+        bugs: [],
+        notes: 'POC for Cat-20 multi-context orchestration. Two BRT contexts open the same fresh record, both modify Config D, both click Save within ~500ms. Captures the final server-side state via a third verifier context. First run is data collection — refines to strict expect on the second pass.',
+        tcRef: null,
+    },
 ];
 
 // ═══════════════════════════════════════════════════════════════════════
