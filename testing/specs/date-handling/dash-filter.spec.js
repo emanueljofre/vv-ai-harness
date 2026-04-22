@@ -9,18 +9,32 @@
  */
 const { test, expect } = require('@playwright/test');
 const path = require('path');
+const { customerTemplates, FIELD_MAP, vvConfig } = require('../../fixtures/vv-config');
 
 const AUTH_STATE_PATH = path.join(__dirname, '..', '..', 'config', 'auth-state-pw.json');
-const DASHBOARD_URL =
-    'https://vvdemo.visualvault.com/app/EmanuelJofre/Main/FormDataDetails?Mode=ReadOnly&ReportID=e522c887-e72e-f111-ba23-0e3ceb11fc25';
+const DASHBOARD_URL = customerTemplates.dashboardDateTest;
 
+// Field names resolve per-customer via the active FIELD_MAP.
+// A: date-only, C: DateTime, D: DateTime+ignoreTZ.
 const DB5_QUERIES = [
-    { id: 'db-5-exact', sql: "Field7 = '3/15/2026'", desc: 'Exact date match on date-only field' },
-    { id: 'db-5-range', sql: "Field7 >= '3/14/2026' AND Field7 <= '3/15/2026'", desc: 'Date range on date-only field' },
-    { id: 'db-5-dt-exact', sql: "Field6 = '3/15/2026'", desc: 'Exact date match on DateTime field' },
+    {
+        id: 'db-5-exact',
+        sql: `${FIELD_MAP.A.field} = '3/15/2026'`,
+        desc: 'Exact date match on date-only field',
+    },
+    {
+        id: 'db-5-range',
+        sql: `${FIELD_MAP.A.field} >= '3/14/2026' AND ${FIELD_MAP.A.field} <= '3/15/2026'`,
+        desc: 'Date range on date-only field',
+    },
+    {
+        id: 'db-5-dt-exact',
+        sql: `${FIELD_MAP.C.field} = '3/15/2026'`,
+        desc: 'Exact date match on DateTime field',
+    },
     {
         id: 'db-5-dt-range',
-        sql: "Field5 >= '3/14/2026' AND Field5 <= '3/15/2026 11:59 PM'",
+        sql: `${FIELD_MAP.D.field} >= '3/14/2026' AND ${FIELD_MAP.D.field} <= '3/15/2026 11:59 PM'`,
         desc: 'DateTime range on ignoreTZ field',
     },
 ];

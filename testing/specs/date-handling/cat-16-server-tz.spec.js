@@ -46,7 +46,9 @@ for (const tc of categoryTests) {
 
             // Verify code path (V1 vs V2)
             const isV2 = await getCodePath(page);
-            /* [V2 baseline] gate disabled: */ void isV2;
+            const envScope = isV2 ? 'V2' : 'V1';
+            const entryScope = tc.scope || 'V1';
+            test.skip(envScope !== entryScope, `Entry scope=${entryScope} but active env is ${envScope}`);
 
             // Verify field exists with expected config flags
             const fieldName = await verifyField(page, {

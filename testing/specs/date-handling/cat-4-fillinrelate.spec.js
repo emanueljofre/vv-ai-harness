@@ -42,7 +42,9 @@ for (const tc of chainTests) {
             expect(dateStr).toContain(tc.tzOffset);
 
             const isV2 = await getCodePath(page);
-            /* [V2 baseline] gate disabled: */ void isV2;
+            const envScope = isV2 ? 'V2' : 'V1';
+            const entryScope = tc.scope || 'V1';
+            test.skip(envScope !== entryScope, `Entry scope=${entryScope} but active env is ${envScope}`);
 
             // Set value on source field
             await setFieldValue(page, sourceCfg.field, tc.inputDateStr);
@@ -65,9 +67,11 @@ for (const tc of chainTests) {
                 [targetCfg.field]: sourceGfv,
             });
 
-            // Verify target code path
+            // Verify target code path matches the entry's scope. For V2 entries the target
+            // form should also be on V2 (same env); for V1 entries it should be V1.
             const targetV2 = await getCodePath(page);
-            expect(targetV2).toBe(false);
+            const targetScope = targetV2 ? 'V2' : 'V1';
+            expect(targetScope).toBe(entryScope);
 
             // Capture target values
             const targetValues = await captureFieldValues(page, targetCfg.field);

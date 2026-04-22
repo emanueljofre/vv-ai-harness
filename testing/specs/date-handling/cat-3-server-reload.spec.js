@@ -36,7 +36,7 @@ for (const tc of categoryTests) {
 
             if (tc.savedRecord && SAVED_RECORDS[tc.savedRecord]) {
                 // Pre-saved record (preferred for Cat 3): load directly
-                const recordPath = SAVED_RECORDS[tc.savedRecord];
+                const recordPath = SAVED_RECORDS[tc.savedRecord].url;
                 const recordUrl = `${baseURL}${recordPath}`;
                 await gotoAndWaitForVVForm(page, recordUrl);
             } else {
@@ -51,7 +51,9 @@ for (const tc of categoryTests) {
 
             // Verify code path (V1 vs V2)
             const isV2 = await getCodePath(page);
-            /* [V2 baseline] gate disabled: */ void isV2; // All current tests assume V1
+            const envScope = isV2 ? 'V2' : 'V1';
+            const entryScope = tc.scope || 'V1';
+            test.skip(envScope !== entryScope, `Entry scope=${entryScope} but active env is ${envScope}`);
 
             // Verify field exists with expected config flags
             const fieldName = await verifyField(page, {

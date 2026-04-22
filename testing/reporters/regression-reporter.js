@@ -86,7 +86,16 @@ class RegressionReporter {
             }
         }
 
-        this.results.push(entry);
+        // Dedupe by (tcId, project) keeping only the most recent attempt. Playwright
+        // calls onTestEnd once per attempt — for tests with retries that eventually
+        // pass, the earlier failed attempt must not count as a separate failure.
+        const dedupeKey = `${entry.tcId}|${entry.project}`;
+        const existingIdx = this.results.findIndex((r) => `${r.tcId}|${r.project}` === dedupeKey);
+        if (existingIdx >= 0) {
+            this.results[existingIdx] = entry;
+        } else {
+            this.results.push(entry);
+        }
     }
 
     onEnd(result) {
@@ -119,18 +128,23 @@ class RegressionReporter {
      * Extract a slot ID from the test's describe chain + own title.
      *
      * Supported patterns (checked in order — finer-grained wins):
-     *   1. Fine-grained slot in test title:           db-5-exact: ..., doc-1-iso-date: ..., wf-1-brt-midday: ..., sp-2-now-brt: ..., ws-1-...
-     *   2. Forms TC ID (walk up parent chain):        TC-1-A-BRT: ..., TC-12-empty-value: ...
-     *   3. Category-level ID (walk up parent chain):  DB-5: ..., DOC-1: ..., WF-2: ..., SP-3: ..., WS-4: ...
+     *   1. Component-prefixed slot in test title:     db-5-exact: ..., doc-1-iso-date: ..., wf-1-brt-midday: ..., sp-2-now-brt: ..., ws-1-...
+     *   2. Bare-digit forms slot in test title:       15-vv-core — ..., 12-dst-brazil — ...   (separator can be colon, em-dash, or en-dash)
+     *   3. Forms TC ID (walk up parent chain):        TC-1-A-BRT: ..., TC-12-empty-value: ...
+     *   4. Category-level ID (walk up parent chain):  DB-5: ..., DOC-1: ..., WF-2: ..., SP-3: ..., WS-4: ...
      *
      * Returns the matched slot ID (lowercased for consistency with matrix IDs where applicable).
      */
     _extractTcId(test) {
-        // (1) Fine-grained slot in the leaf test title (preferred — most specific)
+        // (1) Component-prefixed fine-grained slot in the leaf test title
         const fineGrained = test.title?.match(/^((?:db|doc|wf|sp|ws)-\d+[A-Za-z0-9-]*):/i);
         if (fineGrained) return fineGrained[1].toLowerCase();
 
-        // (2) Forms TC ID walking up the parent chain
+        // (2) Bare-digit forms slot in test title — `15-vv-core — desc` or `12-dst-brazil: desc`
+        const bare = test.title?.match(/^([0-9][0-9]?[A-Z]?-[A-Za-z0-9][A-Za-z0-9-]*?)(?:\s*[—–:-]\s|\s*$)/);
+        if (bare) return bare[1];
+
+        // (3) Forms TC ID walking up the parent chain
         let current = test.parent;
         while (current) {
             const m = current.title?.match(/^TC-(.+?):/);
@@ -138,7 +152,7 @@ class RegressionReporter {
             current = current.parent;
         }
 
-        // (3) Category-level ID (DB-*, DOC-*, WF-*, SP-*, WS-*) walking up the parent chain
+        // (4) Category-level ID (DB-*, DOC-*, WF-*, SP-*, WS-*) walking up the parent chain
         current = test.parent;
         while (current) {
             const cat = current.title?.match(/^((?:DB|DOC|WF|SP|WS)-\d+[A-Za-z0-9-]*):/);
@@ -146,7 +160,7 @@ class RegressionReporter {
             current = current.parent;
         }
 
-        // (4) Fallback: forms TC ID embedded in the leaf title itself
+        // (5) Fallback: forms TC ID embedded in the leaf title itself
         const titleMatch = test.title?.match(/TC-(.+?)[\s:]/);
         return titleMatch ? titleMatch[1] : null;
     }

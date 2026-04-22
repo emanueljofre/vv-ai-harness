@@ -10,12 +10,15 @@ const { test, expect } = require('@playwright/test');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
+const { customerTemplates, FIELD_MAP } = require('../../fixtures/vv-config');
 
 const AUTH_STATE_PATH = path.join(__dirname, '..', '..', 'config', 'auth-state-pw.json');
-const DASHBOARD_URL =
-    'https://vvdemo.visualvault.com/app/EmanuelJofre/Main/FormDataDetails?Mode=ReadOnly&ReportID=e522c887-e72e-f111-ba23-0e3ceb11fc25';
+const DASHBOARD_URL = customerTemplates.dashboardDateTest;
 
-const DATE_FIELDS = [
+// Field names resolve per-customer via the active FIELD_MAP.
+const DATE_FIELDS = Object.values(FIELD_MAP).flatMap((c) => [c.field, c.preset, c.currentDate].filter(Boolean));
+
+const __LEGACY_DATE_FIELDS_UNUSED = [
     'Field1',
     'Field2',
     'Field5',
@@ -151,7 +154,30 @@ function parseHtmlExport(filePath) {
 function parseXmlExport(filePath) {
     const content = fs.readFileSync(filePath, 'utf-8');
     const records = [];
-    const rowMatches = content.matchAll(/<DateTest>([\s\S]*?)<\/DateTest>/gi);
+
+    // Auto-detect the row element. Dashboard XML export names the row after the
+    // form template with spaces stripped: "Date Test Harness" → <DateTestHarness>.
+    // Strategy: the row tag is the most frequent opening tag whose count matches
+    // the count of <Form_x0020_ID>. This is robust to outer containers (1 occurrence)
+    // and schema/xs:* definitions.
+    const formIdCount = (content.match(/<Form_x0020_ID>/gi) || []).length;
+    const openingTags = content.match(/<([A-Za-z_][\w]*)\b[^>]*>/g) || [];
+    const tagCounts = {};
+    for (const open of openingTags) {
+        const name = open.match(/<([A-Za-z_][\w]*)/)[1];
+        tagCounts[name] = (tagCounts[name] || 0) + 1;
+    }
+    // Prefer exact match on Form_x0020_ID count; fall back to the most-frequent tag
+    // excluding known schema noise.
+    const exactMatches = Object.entries(tagCounts).filter(([, c]) => c === formIdCount);
+    const rowTag =
+        exactMatches[0]?.[0] ||
+        Object.entries(tagCounts)
+            .filter(([n]) => !/^(xs:|VisualVault|Form_x0020_ID)/.test(n))
+            .sort((a, b) => b[1] - a[1])[0]?.[0] ||
+        'DateTest';
+    const rowRe = new RegExp(`<${rowTag}\\b[^>]*>([\\s\\S]*?)<\\/${rowTag}>`, 'gi');
+    const rowMatches = content.matchAll(rowRe);
 
     for (const rowMatch of rowMatches) {
         const rowXml = rowMatch[1];
@@ -172,7 +198,7 @@ function parseXmlExport(filePath) {
         if (formId) records.push({ formId, fields });
     }
 
-    return { totalRows: records.length, records };
+    return { totalRows: records.length, records, rowTag };
 }
 
 function compareRecords(gridRecords, exportRecords, format) {
@@ -237,7 +263,7 @@ test.describe('DB-7: Dashboard Export Verification', () => {
     test.use({ storageState: AUTH_STATE_PATH });
 
     for (const format of ['excel', 'word', 'xml']) {
-        test(`${format} export matches grid date values`, async ({ page }) => {
+        test(`db-7-${format}: ${format} export matches grid date values`, async ({ page }) => {
             test.setTimeout(120000);
 
             await page.goto(DASHBOARD_URL, { waitUntil: 'networkidle', timeout: 60000 });

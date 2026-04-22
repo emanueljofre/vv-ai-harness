@@ -24,6 +24,12 @@ const path = require('path');
 
 const REPO_ROOT = path.resolve(__dirname, '..', '..');
 const PROJECTS_DIR = path.join(REPO_ROOT, 'projects');
+const TEST_DATA_PATH = path.join(REPO_ROOT, 'testing', 'fixtures', 'test-data.js');
+
+// Actions in test-data.js that mark an entry as non-executable by design.
+// These are intent-captured (the matrix row's purpose is documented) but won't
+// run as a regression test — not the same as "pending".
+const NON_EXECUTABLE_ACTIONS = new Set(['umbrella', 'skip', 'theoretical']);
 
 // Per-component matrix configuration.
 //   matrixPath : where to read TC IDs from
@@ -88,6 +94,25 @@ for (const c of componentsToRun) {
         console.error(`Unknown component: ${c}. Available: ${Object.keys(COMPONENTS).join(', ')}`);
         process.exit(1);
     }
+}
+
+// Extract `{ id, action }` tuples from testing/fixtures/test-data.js by scanning
+// the source for `id: '...'` and `action: '...'` pairs. Cheap and robust enough
+// for our conventions. Returns a Map keyed by lowercased id.
+function parseTestDataActions() {
+    const out = new Map();
+    if (!fs.existsSync(TEST_DATA_PATH)) return out;
+    const src = fs.readFileSync(TEST_DATA_PATH, 'utf8');
+    // Match `{ id: '...', ... action: '...' }` blocks. Scan entry-by-entry
+    // by splitting on `},\s*{` — brittle but works for the file's current style.
+    const entries = src.split(/},\s*{/);
+    for (const entry of entries) {
+        const idMatch = entry.match(/\bid:\s*['"]([^'"]+)['"]/);
+        const actionMatch = entry.match(/\baction:\s*['"]([^'"]+)['"]/);
+        if (!idMatch) continue;
+        out.set(idMatch[1].toLowerCase(), actionMatch ? actionMatch[1] : null);
+    }
+    return out;
 }
 
 // Parse fine-grained TC slot IDs from a matrix markdown file using the
@@ -201,13 +226,55 @@ const history = perTcHistory(runs);
 const historyLc = new Map();
 for (const [tc, entries] of history) historyLc.set(String(tc).toLowerCase(), entries);
 
+// Load test-data.js actions so we can flag intentionally-non-executable slots
+// (umbrella/skip/theoretical) distinct from truly pending work.
+const testDataActions = parseTestDataActions();
+
+// A slot is "umbrella-covered" if it isn't directly in history but at least one
+// fine-grained child TC (history key starting with `${slot}-`) is.
+function umbrellaChildrenOf(slot, historyKeys) {
+    const prefix = slot + '-';
+    return [...historyKeys].filter((h) => h.startsWith(prefix));
+}
+
 const allComponents = {};
 for (const comp of componentsToRun) {
     const { matrixPath, slotRegex } = COMPONENTS[comp];
     const slots = parseMatrixSlots(matrixPath, slotRegex);
 
-    const executed = slots.filter((s) => historyLc.has(s));
-    const pending = slots.filter((s) => !historyLc.has(s));
+    // Partition matrix slots into executed / non-executable / umbrella-covered / pending.
+    const executed = [];
+    const nonExecutable = []; // test-data entry exists but action is umbrella/skip/theoretical
+    const umbrellaCovered = []; // no test-data entry OR test-data says runnable, but fine-grained children executed
+    const pending = []; // actually needs work
+
+    const historyKeysLc = [...historyLc.keys()];
+    // A matrix slot is "executed" if either its base ID or any scope-suffixed
+    // variant (`.v2`, etc.) is in history. We track the set of variants per slot
+    // so per-TC rollup can surface the best (non-skipped) status across variants.
+    const variantsOfSlot = (slot) => {
+        const base = slot;
+        const v2 = `${slot}.v2`;
+        return [base, v2].filter((k) => historyLc.has(k));
+    };
+    for (const slot of slots) {
+        const variants = variantsOfSlot(slot);
+        if (variants.length > 0) {
+            executed.push({ slot, variants });
+            continue;
+        }
+        const action = testDataActions.get(slot);
+        if (action && NON_EXECUTABLE_ACTIONS.has(action)) {
+            nonExecutable.push({ slot, action });
+            continue;
+        }
+        const children = umbrellaChildrenOf(slot, historyKeysLc);
+        if (children.length > 0) {
+            umbrellaCovered.push({ slot, children });
+            continue;
+        }
+        pending.push(slot);
+    }
 
     // Extras specific to this component's ID format — so we only claim "extra" when
     // the observed ID clearly belongs to this component's namespace.
@@ -215,16 +282,22 @@ for (const comp of componentsToRun) {
         `^(${slotRegex.source.match(/\(\?:([^)]+)\)|\(([a-z]+)/)?.[1] || comp.split('-')[0]})-`,
         'i'
     );
-    const extraTcs = [...historyLc.keys()].filter((tc) => nsRegex.test(tc) && !slots.includes(tc));
+    const extraTcs = historyKeysLc.filter((tc) => nsRegex.test(tc) && !slots.includes(tc));
 
-    const perTc = executed.map((tc) => {
-        const entries = historyLc.get(tc);
-        const last = lastStatusOf(historyLc, tc);
+    const perTc = executed.map(({ slot, variants }) => {
+        // Merge entries from every variant (base + .v2 etc.); pick best non-skip status.
+        const allEntries = variants.flatMap((v) => historyLc.get(v) || []);
+        const nonSkip = allEntries.filter((e) => e.status !== 'skipped');
+        const recent = (nonSkip.length ? nonSkip : allEntries).sort(
+            (a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0)
+        );
+        const last = recent[0] || null;
         const pStatus = { passed: 0, failed: 0, timedOut: 0, skipped: 0 };
-        for (const e of entries) pStatus[e.status] = (pStatus[e.status] || 0) + 1;
+        for (const e of allEntries) pStatus[e.status] = (pStatus[e.status] || 0) + 1;
         return {
-            tcId: tc,
-            runs: entries.length,
+            tcId: slot,
+            variants,
+            runs: allEntries.length,
             lastStatus: last?.status || null,
             lastTimestamp: last?.timestamp || null,
             lastFingerprint: last?.fingerprint || null,
@@ -234,14 +307,20 @@ for (const comp of componentsToRun) {
         };
     });
 
-    const counts = { total: slots.length, executed: executed.length, pending: pending.length };
+    const counts = {
+        total: slots.length,
+        executed: executed.length,
+        nonExecutable: nonExecutable.length,
+        umbrellaCovered: umbrellaCovered.length,
+        pending: pending.length,
+    };
     const byLastStatus = { passed: 0, failed: 0, timedOut: 0, skipped: 0, unknown: 0 };
     for (const t of perTc) {
         const key = t.lastStatus && byLastStatus[t.lastStatus] !== undefined ? t.lastStatus : 'unknown';
         byLastStatus[key]++;
     }
 
-    allComponents[comp] = { counts, byLastStatus, perTc, pending, extraTcs };
+    allComponents[comp] = { counts, byLastStatus, perTc, pending, nonExecutable, umbrellaCovered, extraTcs };
 }
 
 // --- Output ---
@@ -251,7 +330,7 @@ if (JSON_OUTPUT) {
 }
 
 function renderComponent(comp, data) {
-    const { counts, byLastStatus, perTc, pending, extraTcs } = data;
+    const { counts, byLastStatus, perTc, pending, nonExecutable, umbrellaCovered, extraTcs } = data;
     const lines = [];
     lines.push(`# Task Status — ${PROJECT} / ${comp}`);
     lines.push('');
@@ -265,7 +344,9 @@ function renderComponent(comp, data) {
     lines.push('| --- | --- |');
     lines.push(`| Matrix slots | **${counts.total}** |`);
     lines.push(`| Executed (≥1 non-skip run) | **${counts.executed}** |`);
-    lines.push(`| Pending (in matrix, never executed) | **${counts.pending}** |`);
+    lines.push(`| Umbrella-covered (aggregate row — children executed) | ${counts.umbrellaCovered} |`);
+    lines.push(`| Non-executable (test-data action = umbrella/skip/theoretical) | ${counts.nonExecutable} |`);
+    lines.push(`| **Actionable pending** (need work) | **${counts.pending}** |`);
     lines.push(`| Extras (executed but not in matrix) | ${extraTcs.length} |`);
     lines.push('');
     lines.push('### Executed — last-run status breakdown');
@@ -295,10 +376,10 @@ function renderComponent(comp, data) {
         lines.push('');
     }
 
-    lines.push(`## Pending — ${pending.length} slots never executed on this customer`);
+    lines.push(`## Actionable pending — ${pending.length} slots need work`);
     lines.push('');
     if (pending.length === 0) {
-        lines.push('_All matrix slots have at least one run._');
+        lines.push('_All executable matrix slots have at least one run._');
     } else {
         lines.push('<details><summary>Expand</summary>');
         lines.push('');
@@ -307,6 +388,39 @@ function renderComponent(comp, data) {
         lines.push('</details>');
     }
     lines.push('');
+
+    if (umbrellaCovered.length) {
+        lines.push(`## Umbrella-covered — ${umbrellaCovered.length} aggregate matrix rows`);
+        lines.push('');
+        lines.push("These matrix IDs aren't directly in history but fine-grained children are executed.");
+        lines.push('');
+        lines.push('<details><summary>Expand</summary>');
+        lines.push('');
+        for (const u of umbrellaCovered) {
+            const preview = u.children
+                .slice(0, 3)
+                .map((c) => `\`${c}\``)
+                .join(', ');
+            const more = u.children.length > 3 ? `, +${u.children.length - 3} more` : '';
+            lines.push(`- \`${u.slot}\` → ${preview}${more}`);
+        }
+        lines.push('');
+        lines.push('</details>');
+        lines.push('');
+    }
+
+    if (nonExecutable.length) {
+        lines.push(`## Non-executable — ${nonExecutable.length} intentionally-skipped matrix rows`);
+        lines.push('');
+        lines.push("test-data.js marks these with `action: umbrella|skip|theoretical` — intent captured, won't run.");
+        lines.push('');
+        lines.push('<details><summary>Expand</summary>');
+        lines.push('');
+        for (const n of nonExecutable) lines.push(`- \`${n.slot}\` (action: \`${n.action}\`)`);
+        lines.push('');
+        lines.push('</details>');
+        lines.push('');
+    }
 
     if (extraTcs.length) {
         lines.push(`## Extras — executed but not in matrix (${extraTcs.length})`);
@@ -327,13 +441,15 @@ if (componentsToRun.length > 1) {
         (acc, d) => {
             acc.slots += d.counts.total;
             acc.executed += d.counts.executed;
+            acc.umbrellaCovered += d.counts.umbrellaCovered;
+            acc.nonExecutable += d.counts.nonExecutable;
             acc.pending += d.counts.pending;
             acc.passed += d.byLastStatus.passed;
             acc.failed += d.byLastStatus.failed;
             acc.timedOut += d.byLastStatus.timedOut;
             return acc;
         },
-        { slots: 0, executed: 0, pending: 0, passed: 0, failed: 0, timedOut: 0 }
+        { slots: 0, executed: 0, umbrellaCovered: 0, nonExecutable: 0, pending: 0, passed: 0, failed: 0, timedOut: 0 }
     );
 
     const rollup = [];
@@ -343,16 +459,20 @@ if (componentsToRun.length > 1) {
     rollup.push('');
     rollup.push('## Cross-Component Rollup');
     rollup.push('');
-    rollup.push('| Component | Slots | Executed | Pending | Passed | Failed | TimedOut | Per-component status |');
-    rollup.push('| --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |');
+    rollup.push('`Pending` = actionable (not umbrella/skip/theoretical and not covered by a fine-grained child).');
+    rollup.push('');
+    rollup.push(
+        '| Component | Slots | Executed | Umbrella | NonExec | Pending | Passed | Failed | TimedOut | Status |'
+    );
+    rollup.push('| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |');
     for (const comp of componentsToRun) {
         const d = allComponents[comp];
         rollup.push(
-            `| ${comp} | ${d.counts.total} | ${d.counts.executed} | ${d.counts.pending} | ${d.byLastStatus.passed} | ${d.byLastStatus.failed} | ${d.byLastStatus.timedOut} | [\`${comp}/status.md\`](${comp}/status.md) |`
+            `| ${comp} | ${d.counts.total} | ${d.counts.executed} | ${d.counts.umbrellaCovered} | ${d.counts.nonExecutable} | **${d.counts.pending}** | ${d.byLastStatus.passed} | ${d.byLastStatus.failed} | ${d.byLastStatus.timedOut} | [\`${comp}/status.md\`](${comp}/status.md) |`
         );
     }
     rollup.push(
-        `| **TOTAL** | **${total.slots}** | **${total.executed}** | **${total.pending}** | **${total.passed}** | **${total.failed}** | **${total.timedOut}** | |`
+        `| **TOTAL** | **${total.slots}** | **${total.executed}** | **${total.umbrellaCovered}** | **${total.nonExecutable}** | **${total.pending}** | **${total.passed}** | **${total.failed}** | **${total.timedOut}** | |`
     );
     rollup.push('');
     rollup.push('Regenerate with: `npm run task:status -- --project ' + PROJECT + ' --write`');

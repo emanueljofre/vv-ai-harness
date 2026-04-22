@@ -28,8 +28,11 @@ const config = loadConfig();
 const BASE_URL = config.baseUrl;
 const API_BASE = `/api/v1/${config.customerAlias}/${config.databaseAlias}`;
 
-const DOC_ID = customerDocConfig.testDocumentId;
-const DATE_FIELD_LABEL = customerDocConfig.dateFieldLabel;
+// Skip the whole spec if this customer has no doc-test assets configured
+// (missing testDocumentId, docapi disabled, etc.). Prevents 30+ noisy failures.
+const DOC_ENABLED = !!(customerDocConfig && customerDocConfig.testDocumentId);
+const DOC_ID = customerDocConfig?.testDocumentId || null;
+const DATE_FIELD_LABEL = customerDocConfig?.dateFieldLabel || null;
 
 let token;
 
@@ -70,6 +73,15 @@ async function readDateField(request) {
 }
 
 test.describe.configure({ mode: 'serial' });
+
+// Top-level skip: no test assets or docapi disabled for this env.
+test.beforeEach(() => {
+    test.skip(
+        !DOC_ENABLED,
+        `Document-library tests skipped for ${config.instance} — no customerDocConfig or docapi disabled. ` +
+            `Populate CUSTOMER_DOC_CONFIG in testing/fixtures/vv-config.js with a test document + date field to enable.`
+    );
+});
 
 // ---------------------------------------------------------------------------
 // DOC-1: API Write Format Normalization

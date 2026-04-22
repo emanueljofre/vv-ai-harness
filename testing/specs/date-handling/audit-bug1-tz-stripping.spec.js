@@ -78,7 +78,9 @@ for (const tc of PHASE1_CASES) {
             // Confirm TZ and V1
             const browserTZ = await getBrowserTimezone(page);
             const isV2 = await getCodePath(page);
-            /* [V2 baseline] gate disabled: */ void isV2;
+            const envScope = isV2 ? 'V2' : 'V1';
+            const entryScope = tc.scope || 'V1';
+            test.skip(envScope !== entryScope, `Entry scope=${entryScope} but active env is ${envScope}`);
 
             // Call parseDateString directly
             const result = await page.evaluate(
@@ -155,7 +157,8 @@ test.describe('Phase 2: V1 Call Trace — parseDateString invocation during V1 o
     test('typed input on Config A (date-only) does NOT call parseDateString', async ({ page }, testInfo) => {
         test.skip(!testInfo.project.name.startsWith('BRT-chromium'), 'V1 trace runs in BRT-chromium only');
         await gotoAndWaitForVVForm(page, FORM_TEMPLATE_URL);
-        expect(await getCodePath(page)).toBe(false);
+        const _auditIsV2 = await getCodePath(page);
+        test.skip(_auditIsV2, 'V1-audit test — skip on V2 env (Phase 2/4/5 document V1 behavior)');
 
         // Instrument parseDateString
         await page.evaluate(() => {
@@ -187,7 +190,8 @@ test.describe('Phase 2: V1 Call Trace — parseDateString invocation during V1 o
     test('typed input on Config D (datetime, ignoreTZ) does NOT call parseDateString', async ({ page }, testInfo) => {
         test.skip(!testInfo.project.name.startsWith('BRT-chromium'), 'V1 trace runs in BRT-chromium only');
         await gotoAndWaitForVVForm(page, FORM_TEMPLATE_URL);
-        expect(await getCodePath(page)).toBe(false);
+        const _auditIsV2 = await getCodePath(page);
+        test.skip(_auditIsV2, 'V1-audit test — skip on V2 env (Phase 2/4/5 document V1 behavior)');
 
         await page.evaluate(() => {
             const svc = VV.Form.calendarValueService;
@@ -217,7 +221,8 @@ test.describe('Phase 2: V1 Call Trace — parseDateString invocation during V1 o
     test('SetFieldValue on Config A does NOT call parseDateString', async ({ page }, testInfo) => {
         test.skip(!testInfo.project.name.startsWith('BRT-chromium'), 'V1 trace runs in BRT-chromium only');
         await gotoAndWaitForVVForm(page, FORM_TEMPLATE_URL);
-        expect(await getCodePath(page)).toBe(false);
+        const _auditIsV2 = await getCodePath(page);
+        test.skip(_auditIsV2, 'V1-audit test — skip on V2 env (Phase 2/4/5 document V1 behavior)');
 
         await page.evaluate(() => {
             const svc = VV.Form.calendarValueService;
@@ -247,7 +252,8 @@ test.describe('Phase 2: V1 Call Trace — parseDateString invocation during V1 o
     test('calendar popup on Config C does NOT call parseDateString', async ({ page }, testInfo) => {
         test.skip(!testInfo.project.name.startsWith('BRT-chromium'), 'V1 trace runs in BRT-chromium only');
         await gotoAndWaitForVVForm(page, FORM_TEMPLATE_URL);
-        expect(await getCodePath(page)).toBe(false);
+        const _auditIsV2 = await getCodePath(page);
+        test.skip(_auditIsV2, 'V1-audit test — skip on V2 env (Phase 2/4/5 document V1 behavior)');
 
         await page.evaluate(() => {
             const svc = VV.Form.calendarValueService;
@@ -403,7 +409,8 @@ test.describe('Phase 4: V2 flag flip — parseDateString called under V2', () =>
         await gotoAndWaitForVVForm(page, FORM_TEMPLATE_URL);
 
         // Confirm V1 is default
-        expect(await getCodePath(page)).toBe(false);
+        const _auditIsV2 = await getCodePath(page);
+        test.skip(_auditIsV2, 'V1-audit test — skip on V2 env (Phase 2/4/5 document V1 behavior)');
 
         // Flip to V2
         await page.evaluate(() => {
@@ -453,11 +460,12 @@ test.describe('Phase 5: Cross-TZ saved record reload — V1 init path real impac
         test.skip(!testInfo.project.name.endsWith('-chromium'), 'Audit runs on chromium only');
         test.skip(!['BRT', 'IST', 'UTC0'].includes(tzPrefix), 'Runs in BRT, IST, UTC0');
 
-        const recordUrl = SAVED_RECORDS['cat3-A-BRT'];
+        const recordUrl = SAVED_RECORDS['cat3-A-BRT'].url;
         test.skip(!recordUrl, 'No saved record URL for cat3-A-BRT');
 
         await gotoAndWaitForVVForm(page, recordUrl);
-        expect(await getCodePath(page)).toBe(false);
+        const _auditIsV2 = await getCodePath(page);
+        test.skip(_auditIsV2, 'V1-audit test — skip on V2 env (Phase 2/4/5 document V1 behavior)');
 
         const browserTZ = await getBrowserTimezone(page);
 
@@ -505,11 +513,12 @@ test.describe('Phase 5: Cross-TZ saved record reload — V1 init path real impac
         test.skip(!testInfo.project.name.endsWith('-chromium'), 'Audit runs on chromium only');
         test.skip(!['BRT', 'IST', 'UTC0'].includes(tzPrefix), 'Runs in BRT, IST, UTC0');
 
-        const recordUrl = SAVED_RECORDS['cat3-AD-IST'];
+        const recordUrl = SAVED_RECORDS['cat3-AD-IST'].url;
         test.skip(!recordUrl, 'No saved record URL for cat3-AD-IST');
 
         await gotoAndWaitForVVForm(page, recordUrl);
-        expect(await getCodePath(page)).toBe(false);
+        const _auditIsV2 = await getCodePath(page);
+        test.skip(_auditIsV2, 'V1-audit test — skip on V2 env (Phase 2/4/5 document V1 behavior)');
 
         const browserTZ = await getBrowserTimezone(page);
 

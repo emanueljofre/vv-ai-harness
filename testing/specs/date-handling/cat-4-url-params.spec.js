@@ -42,7 +42,9 @@ for (const tc of categoryTests) {
 
             // Verify code path (V1 vs V2)
             const isV2 = await getCodePath(page);
-            /* [V2 baseline] gate disabled: */ void isV2; // All current tests assume V1
+            const envScope = isV2 ? 'V2' : 'V1';
+            const entryScope = tc.scope || 'V1';
+            test.skip(envScope !== entryScope, `Entry scope=${entryScope} but active env is ${envScope}`);
 
             // Capture and verify stored values
             const values = await captureFieldValues(page, fieldCfg.field);

@@ -2,72 +2,60 @@
  * DB-6 — Dashboard Cross-Layer Comparison Tests
  *
  * Compares dashboard grid values vs Forms SPA display for the same records.
- * Tests DateTest-000889 (date-only A,B,E,F) and DateTest-000890 (DateTime C,D,G,H).
- * For each config: captures dashboard grid value, navigates to form, captures form values.
+ * For each record × config: captures dashboard grid value, navigates to form, captures form values.
  *
- * Converted from research/date-handling/dashboards/test-cross-layer.js
+ * Environment-agnostic — reads:
+ *   - dashboard URL + xcid/xcdid from `customerTemplates` (vv-config.js)
+ *   - reference record DataID + instanceName from `SAVED_RECORDS['db6-dateonly' | 'db6-datetime']`,
+ *     which global-setup creates fresh and tags with the current build fingerprint.
+ *   - config → record assignment from `DB6_RECORD_CONFIGS` (customer-agnostic)
+ *   - field names per config from the active `FIELD_MAP`
+ *
+ * Records are recreated whenever the platform build fingerprint changes — so this
+ * test never compares against records saved under a different build.
  */
 const { test, expect } = require('@playwright/test');
 const path = require('path');
+const {
+    customerTemplates,
+    vvConfig,
+    FIELD_MAP,
+    SAVED_RECORDS,
+    DB6_RECORD_CONFIGS,
+} = require('../../fixtures/vv-config');
 
 const AUTH_STATE_PATH = path.join(__dirname, '..', '..', 'config', 'auth-state-pw.json');
-const DASHBOARD_URL =
-    'https://vvdemo.visualvault.com/app/EmanuelJofre/Main/FormDataDetails?Mode=ReadOnly&ReportID=e522c887-e72e-f111-ba23-0e3ceb11fc25';
-const FORM_BASE = 'https://vvdemo.visualvault.com/FormViewer/app';
-const XCID = '815eb44d-5ec8-eb11-8200-a8333ebd7939';
-const XCDID = '845eb44d-5ec8-eb11-8200-a8333ebd7939';
 
-const DATE_FIELDS = [
-    'Field1',
-    'Field2',
-    'Field3',
-    'Field4',
-    'Field5',
-    'Field6',
-    'Field7',
-    'Field10',
-    'Field11',
-    'Field12',
-    'Field13',
-    'Field14',
-    'Field15',
-    'Field16',
-    'Field17',
-    'Field18',
-    'Field19',
-    'Field20',
-    'Field21',
-    'Field22',
-    'Field23',
-    'Field24',
-    'Field25',
-    'Field26',
-    'Field27',
-    'Field28',
-];
+// Env-agnostic URL + xcid/xcdid resolution
+const DASHBOARD_URL = customerTemplates.dashboardDateTest;
+const FORM_BASE = `${vvConfig.baseUrl}/FormViewer/app`;
+const XCID = customerTemplates.xcid;
+const XCDID = customerTemplates.xcdid;
 
-const RECORDS = [
-    {
-        instanceName: 'DateTest-000889',
-        revisionId: 'f85a0b92-b12e-f111-ba23-0e3ceb11fc25',
-        fields: [
-            { config: 'A', field: 'Field7', enableTime: false },
-            { config: 'B', field: 'Field10', enableTime: false },
-            { config: 'E', field: 'Field12', enableTime: false },
-            { config: 'F', field: 'Field11', enableTime: false },
-        ],
-    },
-    {
-        instanceName: 'DateTest-000890',
-        revisionId: '2b5e7795-b12e-f111-ba23-0afff212cc87',
-        fields: [
-            { config: 'C', field: 'Field6', enableTime: true },
-            { config: 'D', field: 'Field5', enableTime: true },
-            { config: 'G', field: 'Field14', enableTime: true },
-            { config: 'H', field: 'Field13', enableTime: true },
-        ],
-    },
-];
+// Build the per-test record list at import time by joining:
+//   DB6_RECORD_CONFIGS[key] = ['A', 'B', 'E', 'F']  (which configs live in this record)
+//   SAVED_RECORDS[key]      = { url, dataId, instanceName }  (runtime IDs from global-setup)
+//   FIELD_MAP[config]       = { field, enableTime, ... }  (active customer field name)
+const RECORDS = [];
+for (const [key, configs] of Object.entries(DB6_RECORD_CONFIGS)) {
+    const saved = SAVED_RECORDS[key];
+    if (!saved || !saved.dataId) continue; // will trigger the skip below
+    RECORDS.push({
+        key,
+        instanceName: saved.instanceName || null,
+        dataId: saved.dataId,
+        fields: configs.map((c) => ({
+            config: c,
+            field: FIELD_MAP[c].field,
+            enableTime: FIELD_MAP[c].enableTime,
+        })),
+    });
+}
+
+// Field list used for dashboard column discovery — derived from the active FIELD_MAP
+// so it matches the current customer's field naming convention (Field7/Field10/... on
+// vvdemo, dateTzAwareV2Empty/... on vv5dev).
+const DATE_FIELDS = Object.values(FIELD_MAP).flatMap((c) => [c.field, c.preset, c.currentDate].filter(Boolean));
 
 async function captureDashboardValues(page, instanceName) {
     return await page.evaluate(
@@ -131,11 +119,39 @@ async function captureFormValues(page, fieldName) {
 test.describe('DB-6: Dashboard vs Forms Cross-Layer', () => {
     test.use({ storageState: AUTH_STATE_PATH });
 
+    // Guard: skip cleanly if dashboard URL or reference records aren't ready.
+    // - Missing URL means the customer hasn't wired a FormDataDetails report into CUSTOMER_TEMPLATES.
+    // - Missing records means global-setup hasn't created db6-dateonly / db6-datetime yet
+    //   (e.g., the current build cleared the saved-records cache and the run is still pending).
+    //   Records are build-fingerprint-tagged, so a stale cache is never silently reused.
+    if (!DASHBOARD_URL) {
+        test.skip(`DB-6 skipped for ${vvConfig.instance} — no dashboardDateTest URL configured in customerTemplates.`, () => {});
+        return;
+    }
+    if (!RECORDS.length) {
+        test.skip(
+            `DB-6 skipped for ${vvConfig.instance} — db6-dateonly / db6-datetime records not found in SAVED_RECORDS. ` +
+                `They are created by global-setup.js and tagged with the current build fingerprint. ` +
+                `Delete testing/config/saved-records.json and re-run to recreate.`,
+            () => {}
+        );
+        return;
+    }
+
     for (const rec of RECORDS) {
-        test.describe(rec.instanceName, () => {
+        test.describe(rec.instanceName || rec.key, () => {
             for (const f of rec.fields) {
-                test(`Config ${f.config} (${f.field}) — dashboard matches form display`, async ({ page }) => {
+                test(`db-6-${f.config.toLowerCase()}-${f.field.toLowerCase()}: Config ${f.config} (${f.field}) — dashboard matches form display`, async ({
+                    page,
+                }) => {
                     test.setTimeout(90000);
+
+                    // If we know the auto-generated instance name, match the dashboard row by it.
+                    // Otherwise fall back to matching by DataID (requires the dashboard to expose a DataID column).
+                    test.skip(
+                        !rec.instanceName,
+                        `Skipping Config ${f.config} — SAVED_RECORDS['${rec.key}'] has no instanceName (save-time capture failed)`
+                    );
 
                     // Load dashboard and capture grid value
                     await page.goto(DASHBOARD_URL, { waitUntil: 'networkidle', timeout: 60000 });
@@ -144,8 +160,8 @@ test.describe('DB-6: Dashboard vs Forms Cross-Layer', () => {
                     const dashValues = await captureDashboardValues(page, rec.instanceName);
                     const dashVal = dashValues[f.field] || '(not found)';
 
-                    // Navigate to form
-                    const formUrl = `${FORM_BASE}?DataID=${rec.revisionId}&hidemenu=true&rOpener=1&xcid=${XCID}&xcdid=${XCDID}`;
+                    // Navigate to form (use runtime DataID, not a hardcoded revisionId)
+                    const formUrl = `${FORM_BASE}?DataID=${rec.dataId}&hidemenu=true&rOpener=1&xcid=${XCID}&xcdid=${XCDID}`;
                     await page.goto(formUrl, { waitUntil: 'networkidle', timeout: 60000 });
                     await page.waitForFunction(
                         () =>

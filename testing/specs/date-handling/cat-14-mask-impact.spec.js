@@ -30,9 +30,13 @@ const categoryTests = TEST_DATA.filter((t) => t.category === 14);
 
 // Group SFV+GFV pairs that must share the same form instance.
 // GFV tests read the value set by the preceding SFV test.
+// Each pair has a V1 and V2 sibling — the V2 GFV must pair with the V2 SFV
+// so the scope filter keeps the run consistent within one form instance.
 const sfvGfvPairs = {
     '14-C-GFV': '14-C-SFV',
     '14-D-GFV': '14-D-SFV',
+    '14-C-GFV.V2': '14-C-SFV.V2',
+    '14-D-GFV.V2': '14-D-SFV.V2',
 };
 
 for (const tc of categoryTests) {
@@ -52,7 +56,9 @@ for (const tc of categoryTests) {
 
             // Verify code path (V1 vs V2)
             const isV2 = await getCodePath(page);
-            /* [V2 baseline] gate disabled: */ void isV2; // All current tests assume V1
+            const envScope = isV2 ? 'V2' : 'V1';
+            const entryScope = tc.scope || 'V1';
+            test.skip(envScope !== entryScope, `Entry scope=${entryScope} but active env is ${envScope}`);
 
             // Verify field exists with expected config flags
             const fieldName = await verifyField(page, {

@@ -59,18 +59,54 @@ async function authenticate() {
 }
 
 /**
- * Create saved form records for cross-TZ tests via browser UI.
+ * Create saved form records for cross-TZ and dashboard tests via browser UI.
+ *
+ * Freshness policy — "fresh per build, not per run":
+ *   Records are stamped with the current platform build fingerprint. Subsequent
+ *   global-setup invocations reuse the records as long as the fingerprint still
+ *   matches (same build). If the platform rolls over, the fingerprint flips and
+ *   all records are recreated — so tests never compare against values saved
+ *   under a different build.
  *
  * Each record is created using the input method specified in RECORD_DEFINITIONS
  * (popup, typed, setFieldValue) to exercise the same code paths users follow.
- * After saving, DataIDs are extracted via VV.Form.DataID and written to
- * saved-records.json for tests to consume.
+ * After saving, DataID + instanceName + URL are written to saved-records.json
+ * along with the build fingerprint.
  */
 async function createRecords() {
-    if (isCacheFresh(SAVED_RECORDS_PATH)) return;
     if (RECORD_DEFINITIONS.length === 0) return;
 
-    const records = {};
+    // Determine current build fingerprint from the just-captured build-context.json
+    let currentFp = null;
+    try {
+        if (fs.existsSync(BUILD_CONTEXT_PATH)) {
+            const ctx = JSON.parse(fs.readFileSync(BUILD_CONTEXT_PATH, 'utf8'));
+            const { fingerprint } = require('../tools/helpers/build-fingerprint');
+            currentFp = ctx.fingerprint || fingerprint(ctx);
+        }
+    } catch {
+        // If we can't read the build context, fall through and recreate records.
+    }
+
+    // Reuse existing records only when the stamped fingerprint matches the current build.
+    if (fs.existsSync(SAVED_RECORDS_PATH)) {
+        try {
+            const existing = JSON.parse(fs.readFileSync(SAVED_RECORDS_PATH, 'utf8'));
+            if (existing && existing.__buildFingerprint && existing.__buildFingerprint === currentFp) {
+                console.log(`[global-setup] Reusing saved records — build ${currentFp} unchanged.`);
+                return;
+            }
+            if (existing && existing.__buildFingerprint && existing.__buildFingerprint !== currentFp) {
+                console.log(
+                    `[global-setup] Recreating saved records — build changed ${existing.__buildFingerprint} → ${currentFp}.`
+                );
+            }
+        } catch {
+            // Unreadable — fall through to recreate.
+        }
+    }
+
+    const records = { __buildFingerprint: currentFp, __createdAt: new Date().toISOString() };
 
     // Group by timezone to minimize browser context switches
     const byTz = {};
@@ -112,7 +148,11 @@ async function createRecords() {
 
             // Save via UI button — same save path users follow
             const result = await saveFormOnly(page);
-            records[def.key] = result.url;
+            records[def.key] = {
+                url: result.url,
+                dataId: result.dataId,
+                instanceName: result.instanceName || null,
+            };
 
             await page.close();
         }

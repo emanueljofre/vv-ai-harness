@@ -115,11 +115,20 @@ async function verifyField(page, config) {
  * @returns {Promise<{raw: string, api: string}>}
  */
 async function captureFieldValues(page, fieldName) {
+    // V2 preserves non-string types (Date objects, numbers for epoch inputs) where
+    // V1 stores strings. Normalize to string so assertions compare semantic values,
+    // not types. Observed type is kept as `rawType`/`apiType` for V1-vs-V2 drift.
     return page.evaluate((name) => {
-        return {
-            raw: VV.Form.VV.FormPartition.getValueObjectValue(name),
-            api: VV.Form.GetFieldValue(name),
+        const raw = VV.Form.VV.FormPartition.getValueObjectValue(name);
+        const api = VV.Form.GetFieldValue(name);
+        const typeOf = (v) => (v instanceof Date ? 'Date' : typeof v);
+        const toStr = (v) => {
+            if (v == null) return v;
+            if (v instanceof Date) return v.toISOString();
+            if (typeof v === 'number' || typeof v === 'boolean') return String(v);
+            return v;
         };
+        return { raw: toStr(raw), api: toStr(api), rawType: typeOf(raw), apiType: typeOf(api) };
     }, fieldName);
 }
 
@@ -234,12 +243,23 @@ async function saveFormOnly(page, timeout = 60000) {
     // and VV assigned a new DataID to the saved record.
     await page.waitForFunction((oldId) => VV.Form.DataID && VV.Form.DataID !== oldId, preSaveId, { timeout });
 
-    return page.evaluate(() => ({
-        dataId: VV.Form.DataID,
-        url:
-            `/FormViewer/app?DataID=${VV.Form.DataID}&hidemenu=true&rOpener=1` +
-            `&xcid=${VV.Form.VV.currentUser.Xcid}&xcdid=${VV.Form.VV.currentUser.Xcdid}`,
-    }));
+    return page.evaluate(() => {
+        // VV auto-generates an instance name per record (e.g. "DateTest-000889").
+        // Several VV.Form properties can carry it depending on FormViewer version —
+        // try the common ones and fall back to empty string.
+        const instanceName =
+            (VV.Form.VV && VV.Form.VV.FormPartition && VV.Form.VV.FormPartition.FormName) ||
+            VV.Form.FormName ||
+            VV.Form.InstanceName ||
+            '';
+        return {
+            dataId: VV.Form.DataID,
+            instanceName,
+            url:
+                `/FormViewer/app?DataID=${VV.Form.DataID}&hidemenu=true&rOpener=1` +
+                `&xcid=${VV.Form.VV.currentUser.Xcid}&xcdid=${VV.Form.VV.currentUser.Xcdid}`,
+        };
+    });
 }
 
 /**
@@ -258,8 +278,17 @@ async function saveFormOnly(page, timeout = 60000) {
 async function saveFormAndReload(page, timeout = 60000) {
     const { dataId, url: savedUrl } = await saveFormOnly(page, timeout);
 
-    // Full reload to clear Angular SPA state and simulate a fresh page load
-    await page.reload({ waitUntil: 'networkidle', timeout });
+    // Navigate explicitly to the saved-record URL. We cannot use page.reload()
+    // because Angular does NOT push the DataID into the browser URL on save
+    // (at least under V2 on vv5dev) — the URL stays at `?formid=...` (template).
+    // A plain reload would therefore re-load the empty template and silently
+    // lose the value we just saved. Navigating to the savedUrl forces the
+    // server to return the persisted record. Verified 2026-04-22 on vv5dev
+    // (FORM-BUG-V2-SAVE-RELOAD-EMPTY investigation — withdrawn after root
+    // cause traced to this helper).
+    const baseURL = new URL(page.url()).origin;
+    const fullSavedUrl = savedUrl.startsWith('http') ? savedUrl : baseURL + savedUrl;
+    await page.goto(fullSavedUrl, { waitUntil: 'networkidle', timeout });
     await page.waitForFunction(
         () =>
             typeof VV !== 'undefined' &&

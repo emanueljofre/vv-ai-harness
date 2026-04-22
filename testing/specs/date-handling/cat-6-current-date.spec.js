@@ -37,7 +37,9 @@ for (const tc of categoryTests) {
 
             // Verify code path (V1 vs V2)
             const isV2 = await getCodePath(page);
-            /* [V2 baseline] gate disabled: */ void isV2; // All current tests assume V1
+            const envScope = isV2 ? 'V2' : 'V1';
+            const entryScope = tc.scope || 'V1';
+            test.skip(envScope !== entryScope, `Entry scope=${entryScope} but active env is ${envScope}`);
 
             // Verify current date field exists and is auto-populated
             const currentDateField = fieldCfg.currentDate;
@@ -47,41 +49,47 @@ for (const tc of categoryTests) {
             }, currentDateField);
             expect(fieldResult).toBe(true);
 
-            // Capture the auto-populated value
+            // Capture the auto-populated value.
+            // V1 stores a Date object; V2 stores an ISO string. Normalize to a Date for
+            // semantic comparison (the test is about WHAT date is stored, not HOW it is
+            // serialized). rawType is recorded as an annotation for observability.
             const values = await page.evaluate((name) => {
                 const raw = VV.Form.VV.FormPartition.getValueObjectValue(name);
                 const api = VV.Form.GetFieldValue(name);
                 const now = new Date();
+                const toDate = (v) => {
+                    if (v instanceof Date) return v;
+                    if (typeof v === 'string' && v.length) {
+                        const d = new Date(v);
+                        return isNaN(d.getTime()) ? null : d;
+                    }
+                    return null;
+                };
+                const rawDate = toDate(raw);
+                const apiDate = toDate(api);
+                const fmt = (d) =>
+                    d ? d.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' }) : null;
                 return {
-                    rawIsDate: raw instanceof Date,
-                    rawIso: raw instanceof Date ? raw.toISOString() : String(raw),
-                    apiIso: api instanceof Date ? api.toISOString() : String(api),
-                    // Get today's date in the browser's local timezone (MM/dd/yyyy)
-                    todayLocal: now.toLocaleDateString('en-US', {
-                        month: '2-digit',
-                        day: '2-digit',
-                        year: 'numeric',
-                    }),
-                    // Get the raw value's date in local timezone
-                    rawLocalDate:
-                        raw instanceof Date
-                            ? raw.toLocaleDateString('en-US', {
-                                  month: '2-digit',
-                                  day: '2-digit',
-                                  year: 'numeric',
-                              })
-                            : null,
+                    rawType: raw instanceof Date ? 'Date' : typeof raw,
+                    rawIso: rawDate ? rawDate.toISOString() : null,
+                    apiType: api instanceof Date ? 'Date' : typeof api,
+                    apiIso: apiDate ? apiDate.toISOString() : String(api),
+                    todayLocal: fmt(now),
+                    rawLocalDate: fmt(rawDate),
+                    apiLocalDate: fmt(apiDate),
                 };
             }, currentDateField);
 
-            // Raw value should be a Date object (not a string)
-            expect(values.rawIsDate).toBe(true);
+            // Record storage-type observations so we can spot format drift across builds
+            testInfo.annotations.push({ type: 'rawType', description: String(values.rawType) });
+            testInfo.annotations.push({ type: 'apiType', description: String(values.apiType) });
 
-            // The local date interpretation of the stored Date should match today
-            expect(values.rawLocalDate).toBe(values.todayLocal);
-
-            // API return should match raw (no transformation for date-only fields)
-            expect(values.apiIso).toBe(values.rawIso);
+            // Semantic assertion — whatever the serialization, raw must parse to today in local TZ
+            expect(values.rawLocalDate, `raw=${JSON.stringify(values.rawIso)} type=${values.rawType}`).toBe(
+                values.todayLocal
+            );
+            // API should resolve to the same date as raw (format may differ between V1/V2)
+            expect(values.apiLocalDate).toBe(values.rawLocalDate);
         });
     });
 }

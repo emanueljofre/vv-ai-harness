@@ -9,14 +9,15 @@
  */
 const { test, expect } = require('@playwright/test');
 const path = require('path');
+const { customerTemplates, FIELD_MAP } = require('../../fixtures/vv-config');
 
 const AUTH_STATE_PATH = path.join(__dirname, '..', '..', 'config', 'auth-state-pw.json');
-const DASHBOARD_URL =
-    'https://vvdemo.visualvault.com/app/EmanuelJofre/Main/FormDataDetails?Mode=ReadOnly&ReportID=e522c887-e72e-f111-ba23-0e3ceb11fc25';
+const DASHBOARD_URL = customerTemplates.dashboardDateTest;
 
+// Per-customer field names. Config A = date-only, Config C = DateTime ignoreTZ=false.
 const SORT_FIELDS = [
-    { field: 'Field7', desc: 'Config A — date-only, ignoreTZ=false' },
-    { field: 'Field6', desc: 'Config C — DateTime, ignoreTZ=false' },
+    { field: FIELD_MAP.A.field, desc: 'Config A — date-only, ignoreTZ=false' },
+    { field: FIELD_MAP.C.field, desc: 'Config C — DateTime, ignoreTZ=false' },
 ];
 
 function parseDateValue(str) {

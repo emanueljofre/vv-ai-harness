@@ -55,6 +55,17 @@ for (const tc of reloadTests) {
                 const dateStr = await getBrowserTimezone(page);
                 expect(dateStr).toContain(tc.tzOffset);
 
+                // Scope filter must run BEFORE source SFV — otherwise V1 entries on a V2
+                // env (or vice-versa) trigger source-side assertions against the wrong
+                // expected values before being skipped.
+                const srcV2 = await getCodePath(page);
+                const srcEnvScope = srcV2 ? 'V2' : 'V1';
+                const srcEntryScope = tc.scope || 'V1';
+                test.skip(
+                    srcEnvScope !== srcEntryScope,
+                    `Entry scope=${srcEntryScope} but active env is ${srcEnvScope}`
+                );
+
                 await setFieldValue(page, sourceCfg.field, tc.inputDateStr);
 
                 const sourceValues = await captureFieldValues(page, sourceCfg.field);
@@ -83,7 +94,9 @@ for (const tc of reloadTests) {
             expect(dateStr).toContain(tc.tzOffset);
 
             const isV2 = await getCodePath(page);
-            /* [V2 baseline] gate disabled: */ void isV2;
+            const envScope = isV2 ? 'V2' : 'V1';
+            const entryScope = tc.scope || 'V1';
+            test.skip(envScope !== entryScope, `Entry scope=${entryScope} but active env is ${envScope}`);
 
             // Verify pre-save values match Cat 4 expectations
             const preSave = await captureFieldValues(page, targetFieldName);
