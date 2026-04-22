@@ -143,9 +143,30 @@ async function captureFieldValues(page, fieldName) {
  * @param {string} value - date string in the format VV expects (varies by config)
  * @param {Object} [options]
  * @param {boolean} [options.waitForValue=true] - wait for getValueObjectValue to be non-empty
+ * @param {number} [options.sfvTimeoutMs=0] - when >0, race the in-page SFV against this timeout.
+ *   Required for V2 scenarios where SFV on empty/null inputs triggers FORM-BUG-8 (the returned
+ *   Promise never resolves). Returns `{ sfvHung: true }` on timeout so the spec can record the
+ *   bug instead of failing with a whole-test timeout. Default 0 keeps V1 and normal-input
+ *   scenarios unchanged.
+ * @returns {Promise<{ sfvHung: boolean }>} — `sfvHung: true` only when `sfvTimeoutMs > 0` and
+ *   the in-page SFV didn't settle before the deadline.
  */
-async function setFieldValue(page, fieldName, value, { waitForValue = true } = {}) {
-    await page.evaluate(({ name, val }) => VV.Form.SetFieldValue(name, val), { name: fieldName, val: value });
+async function setFieldValue(page, fieldName, value, { waitForValue = true, sfvTimeoutMs = 0 } = {}) {
+    const result = await page.evaluate(
+        async ({ name, val, timeoutMs }) => {
+            const sfvResult = VV.Form.SetFieldValue(name, val);
+            if (timeoutMs > 0) {
+                return await Promise.race([
+                    Promise.resolve(sfvResult).then(() => ({ sfvHung: false })),
+                    new Promise((r) => setTimeout(() => r({ sfvHung: true }), timeoutMs)),
+                ]);
+            }
+            await Promise.resolve(sfvResult);
+            return { sfvHung: false };
+        },
+        { name: fieldName, val: value, timeoutMs: sfvTimeoutMs }
+    );
+    if (result.sfvHung) return result;
     if (waitForValue) {
         await page.waitForFunction(
             (name) => {
@@ -156,6 +177,7 @@ async function setFieldValue(page, fieldName, value, { waitForValue = true } = {
             { timeout: 5000 }
         );
     }
+    return result;
 }
 
 /**

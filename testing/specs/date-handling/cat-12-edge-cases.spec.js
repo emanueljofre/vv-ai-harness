@@ -48,12 +48,13 @@ for (const tc of categoryTests) {
             const entryScope = tc.scope || 'V1';
             test.skip(envScope !== entryScope, `Entry scope=${entryScope} but active env is ${envScope}`);
 
-            // Empty/null/invalid inputs on V1: SFV returns quickly but GFV hits FORM-BUG-6
-            // ("Invalid Date") — default 60s timeout is fine.
-            // On V2: FORM-BUG-8 causes SFV(empty|null) to hang forever. This branch is
-            // unreachable now (V1-only entries are skipped above), but if V2 siblings are
-            // added later, wrap the SFV call with Promise.race rather than capping the
-            // whole-test timeout (see previous version for the 15s cap approach).
+            // Empty/null/invalid inputs on V1: SFV returns quickly; GFV hits FORM-BUG-6
+            // ("Invalid Date" for Config D, RangeError for Config C), default 60s timeout is fine.
+            // V2: SFV(empty|null) triggers FORM-BUG-8 (returned Promise never resolves). The
+            // setFieldValue helper accepts sfvTimeoutMs to race the in-page SFV against a deadline
+            // and return {sfvHung:true} instead of hanging the whole test — V2 siblings set
+            // expectedRaw/expectedApi to `__FORM-BUG-8__` so the assertion becomes a deterministic
+            // bug-confirmed PASS.
             const fieldCfg = FIELD_MAP[tc.config];
 
             // Verify field
@@ -66,16 +67,28 @@ for (const tc of categoryTests) {
             expect(fieldName).toBe(fieldCfg.field);
 
             // Set baseline value (skip wait for empty/invalid inputs that won't populate)
-            const waitForValue = tc.inputDateStr !== '' && tc.inputDateStr !== 'not-a-date';
-            await setFieldValue(page, fieldCfg.field, tc.inputDateStr, { waitForValue });
+            const isEmptyOrNullInput = tc.inputDateStr === '' || tc.inputDateStr === null;
+            const waitForValue = !isEmptyOrNullInput && tc.inputDateStr !== 'not-a-date';
+            const sfvTimeoutMs = isEmptyOrNullInput ? 8000 : 0;
+            const sfvResult = await setFieldValue(page, fieldCfg.field, tc.inputDateStr, {
+                waitForValue,
+                sfvTimeoutMs,
+            });
 
-            // Execute round-trip(s) if specified
-            if (tc.action === 'gfvRoundTrip' && tc.trips) {
-                await roundTripCycle(page, fieldCfg.field, tc.trips);
+            let values;
+            if (sfvResult.sfvHung) {
+                // FORM-BUG-8: V2 SFV(empty|null) Promise never resolves. Post-SFV state is
+                // unreliable (side effects in flight), so skip the capture and assert the
+                // sentinel — V2 sibling entries encode this expected outcome.
+                values = { raw: '__FORM-BUG-8__', api: '__FORM-BUG-8__' };
+            } else {
+                // Execute round-trip(s) if specified
+                if (tc.action === 'gfvRoundTrip' && tc.trips) {
+                    await roundTripCycle(page, fieldCfg.field, tc.trips);
+                }
+                values = await captureFieldValues(page, fieldCfg.field);
             }
 
-            // Verify final values
-            const values = await captureFieldValues(page, fieldCfg.field);
             expect(values.raw).toBe(tc.expectedRaw);
             expect(values.api).toBe(tc.expectedApi);
         });
