@@ -71,9 +71,24 @@ const TEST_INVOCATIONS = [
     { action: 'WS-1', tz: 'UTC', configs: 'C,D,H', inputDate: '2026-03-15T14:30:00', extraArgs: '' },
 
     // ═══════════════════════════════════════════════════════════════
+    // WS-SETUP-BASELINE: create a single record with ALL 8 configs (A-H)
+    // populated so WS-2 below can read a deterministic all-configs baseline.
+    // Without this, WS-2 reads whichever WS-1 record was written last in
+    // the loop, which only has a subset of configs set. See the audit note
+    // in projects/emanueljofre-vv5dev/.../v2-baseline-audit.md.
+    // These invocations do NOT produce matrix-tracked rows (no tcId stamping).
+    //
+    // Currently gated to BRT only — IST WS-2 matrix rows are still calibrated
+    // against the last-WS-1 record state. Extending baseline coverage to IST
+    // is a follow-up that needs matrix rewrites (see the audit note).
+    // ═══════════════════════════════════════════════════════════════
+    { action: 'WS-SETUP-BASELINE', tz: 'BRT', configs: '', inputDate: '2026-03-15', extraArgs: '' },
+
+    // ═══════════════════════════════════════════════════════════════
     // WS-2: API Read + Cross-Layer — 16 slots
-    // Reads records created by WS-1 in this run. If WS-1 didn't run,
-    // WS-2 is skipped (no record ID available).
+    // Reads the baseline record created by WS-SETUP-BASELINE above (preferred),
+    // falling back to the last WS-1 record for the TZ if the baseline failed.
+    // If neither is available, WS-2 is skipped.
     // Record IDs are injected dynamically — see resolveRecordIds().
     // ═══════════════════════════════════════════════════════════════
     { action: 'WS-2', tz: 'BRT', configs: 'ALL', inputDate: '', extraArgs: '', needsRecordId: true },
@@ -146,7 +161,13 @@ async function main() {
         // Filter invocations by scope
         let invocations = TEST_INVOCATIONS;
         if (actionFilter) {
-            invocations = invocations.filter((i) => i.action === actionFilter);
+            // Keep WS-SETUP-BASELINE alongside WS-2 so scoping to --action WS-2
+            // still produces a readable record. BASELINE is pipeline plumbing,
+            // not a standalone action.
+            const keepBaseline = actionFilter === 'WS-2';
+            invocations = invocations.filter(
+                (i) => i.action === actionFilter || (keepBaseline && i.action === 'WS-SETUP-BASELINE')
+            );
         }
         if (tzFilter) {
             invocations = invocations.filter((i) => i.tz === tzFilter || i.tz === tzFilter.replace('0', ''));
@@ -170,15 +191,28 @@ async function main() {
         const allResults = [];
         // Track record IDs created by WS-1 for use by WS-2 (dynamic, no hardcoded IDs)
         const createdRecords = {}; // { BRT: 'DateTest-NNNNNN', IST: '...', UTC: '...' }
+        // Track baseline records (all 8 configs populated) for use by WS-2. Preferred
+        // over createdRecords for WS-2 so every config reads back deterministically.
+        const baselineRecords = {}; // { BRT: 'DateTest-NNNNNN', IST: '...' }
+        // If WS-2 is not in scope for a TZ, skip the corresponding baseline invocation.
+        const ws2Scoped = new Set(invocations.filter((i) => i.action === 'WS-2').map((i) => i.tz));
         fs.mkdirSync(RESULTS_DIR, { recursive: true });
 
         for (const inv of invocations) {
-            // WS-2 needs a record ID from a prior WS-1 run
+            // Skip baseline invocations whose TZ has no WS-2 in scope (avoids
+            // creating a record we'll never read).
+            if (inv.action === 'WS-SETUP-BASELINE' && !ws2Scoped.has(inv.tz)) {
+                console.log(`  SKIP WS-SETUP-BASELINE ${inv.tz} — WS-2 not in scope for ${inv.tz}\n`);
+                continue;
+            }
+
+            // WS-2 needs a record ID. Prefer baseline (all 8 configs populated)
+            // over the last WS-1 record (only the last batch's configs populated).
             if (inv.needsRecordId) {
-                const recordId = createdRecords[inv.tz];
+                const recordId = baselineRecords[inv.tz] || createdRecords[inv.tz];
                 if (!recordId) {
                     console.log(
-                        `  SKIP ${inv.action} ${inv.tz} — no record ID available (WS-1 for ${inv.tz} did not run or failed)\n`
+                        `  SKIP ${inv.action} ${inv.tz} — no record ID available (neither WS-SETUP-BASELINE nor WS-1 for ${inv.tz} ran or succeeded)\n`
                     );
                     continue;
                 }
@@ -186,7 +220,8 @@ async function main() {
             }
 
             const tzEnv = TZ_ENV[inv.tz] || 'UTC';
-            const cmdParts = [`TZ=${tzEnv}`, 'node', RUNNER_PATH, `--action ${inv.action}`, `--configs ${inv.configs}`];
+            const cmdParts = [`TZ=${tzEnv}`, 'node', RUNNER_PATH, `--action ${inv.action}`];
+            if (inv.configs) cmdParts.push(`--configs ${inv.configs}`);
             if (inv.inputDate) cmdParts.push(`--input-date ${inv.inputDate}`);
             if (WS_TEMPLATE_NAME && WS_TEMPLATE_NAME !== 'DateTest') {
                 cmdParts.push(`--template-name "${WS_TEMPLATE_NAME}"`);
@@ -223,6 +258,20 @@ async function main() {
                 }
                 const jsonStr = output.substring(firstBrace).trim();
                 const result = JSON.parse(jsonStr);
+
+                // Baseline invocations are pipeline plumbing — they create a record
+                // for WS-2 to read but don't correspond to matrix slots. Capture
+                // the recordID and move on without emitting result rows.
+                if (inv.action === 'WS-SETUP-BASELINE') {
+                    if (result.data?.recordID) {
+                        baselineRecords[inv.tz] = result.data.recordID;
+                        console.log(`  → baseline record for ${inv.tz}: ${result.data.recordID}\n`);
+                    } else {
+                        console.log(`  → WS-SETUP-BASELINE ${inv.tz} produced no recordID\n`);
+                    }
+                    continue;
+                }
+
                 const entries = (result.data?.results || []).map((r) => {
                     // Slot ID composed at write-time so downstream tools (task-status,
                     // audit-ws-v2, generate-ws-artifacts) read `r.tcId` uniformly.

@@ -602,6 +602,64 @@ module.exports.main = async function (ffCollection, vvClient, response) {
         return result;
     }
 
+    async function actionSetupBaseline(inputDate, isDebug) {
+        // WS-SETUP-BASELINE: Create a record with ALL 8 configs (A-H) populated so
+        // WS-2 can read a deterministic "all-configs" baseline instead of depending
+        // on whichever WS-1 invocation ran last in the pipeline. Without this,
+        // WS-2 for configs the pipeline did not set in the last WS-1 read back
+        // empty (see projects/emanueljofre-vv5dev/.../v2-baseline-audit.md note).
+        //
+        // Contract:
+        //   - A, B, E, F (enableTime=false): date-only value (default "2026-03-15")
+        //   - C, D, G, H (enableTime=true):  datetime value  (default "2026-03-15T14:30:00")
+        //   - `inputDate` overrides the date-only base; time portion "T14:30:00" is appended for datetime configs.
+        // Returns the recordID so the pipeline can feed it into WS-2.
+        const baseDate = inputDate || '2026-03-15';
+        // Strip any time portion a caller may have passed (we always pair date-only / datetime per config)
+        const dateOnly = baseDate.split('T')[0];
+        const dateTime = `${dateOnly}T14:30:00`;
+
+        const fieldValues = {};
+        for (const configKey of Object.keys(FIELD_MAP)) {
+            const fieldName = FIELD_MAP[configKey].field;
+            fieldValues[fieldName] = FIELD_MAP[configKey].enableTime ? dateTime : dateOnly;
+        }
+
+        const created = await createFormRecord(fieldValues);
+        const instanceName = created.instanceName;
+        const revisionId = created.revisionId;
+
+        // Read back to confirm the record was populated (also surfaces any API-layer
+        // rejection of specific field values before WS-2 reads it).
+        const record = await readFormRecord(instanceName);
+        const allConfigs = Object.keys(FIELD_MAP);
+        const stored = extractDateFields(record, allConfigs);
+
+        const results = allConfigs.map((configKey) =>
+            buildResultEntry(configKey, {
+                sent: fieldValues[FIELD_MAP[configKey].field],
+                stored: stored[configKey],
+            })
+        );
+
+        const result = {
+            action: 'WS-SETUP-BASELINE',
+            targetConfigs: allConfigs,
+            inputDate: baseDate,
+            recordID: instanceName,
+            revisionId,
+            serverTime: new Date().toISOString(),
+            results,
+        };
+
+        if (isDebug) {
+            result.rawRecord = record;
+            result.fieldValuesSent = fieldValues;
+        }
+
+        return result;
+    }
+
     async function actionGetDate(targetConfigs, recordID, isDebug) {
         // WS-2: Read an existing record and return the API values for each target config
         const record = await readFormRecord(recordID);
@@ -1354,6 +1412,10 @@ module.exports.main = async function (ffCollection, vvClient, response) {
                 if (!inputDate) throw new Error('InputDate is required for WS-1');
                 output.data = await actionSetDate(targetConfigs, inputDate, debug);
                 break;
+            case 'WS-SETUP-BASELINE':
+                // InputDate is optional — harness uses "2026-03-15" when omitted.
+                output.data = await actionSetupBaseline(inputDate, debug);
+                break;
             case 'WS-2':
                 if (!recordID) throw new Error('RecordID is required for WS-2');
                 output.data = await actionGetDate(targetConfigs, recordID, debug);
@@ -1384,7 +1446,9 @@ module.exports.main = async function (ffCollection, vvClient, response) {
                 output.data = await actionFormInstanceCompare(targetConfigs, inputDate, debug);
                 break;
             default:
-                throw new Error(`Unknown action: '${action}'. Valid: WS-1 through WS-10`);
+                throw new Error(
+                    `Unknown action: '${action}'. Valid: WS-1 through WS-10, WS-SETUP-BASELINE`
+                );
         }
 
         // Enrich output with diagnostics

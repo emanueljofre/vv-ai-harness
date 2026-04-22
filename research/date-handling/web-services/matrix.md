@@ -162,21 +162,23 @@ Read existing Forms-saved records via `getForms()` with `expand: true`. Two anal
 
 **Records**:
 
-- DateTest-000080 Rev 2 — saved from BRT (2026-03-31), Config A + D set to 03/15/2026
-- DateTest-000084 Rev 1 — saved from IST (2026-04-01), Config A + D set to 03/15/2026
+- DateTest-000080 Rev 2 — saved from BRT (2026-03-31), Config A + D set to 03/15/2026 (legacy WADNR-era reference)
+- DateTest-000084 Rev 1 — saved from IST (2026-04-01), Config A + D set to 03/15/2026 (legacy WADNR-era reference)
+- **BRT rows (2026-04-22 on):** read from the WS-SETUP-BASELINE record the pipeline creates fresh each run — all 8 configs (A-H) populated via the API write path (WS-1-equivalent). Date-only configs (A/B/E/F) are written as `"2026-03-15"`; DateTime configs (C/D/G/H) are written as `"2026-03-15T14:30:00"`. See `scripts/examples/webservice-test-harness.js` `actionSetupBaseline()` + `testing/pipelines/run-ws-regression.js` TEST_INVOCATIONS.
+- **IST rows:** still calibrated against the last-WS-1 record (no baseline setup for IST yet). `ws-2-A-IST` additionally exercises FORM-BUG-7 via the Forms-saved reference record `DateTest-000084`.
 
-**Note**: These records have known stored values from Forms testing (see `forms-calendar/results.md`). Configs not explicitly set during save may have empty or preset values.
+**Note**: BRT Expected values below reflect the baseline-record state (all configs populated). IST rows retain the legacy reference-record expectations; extending baseline setup to IST is a tracked follow-up (see `projects/emanueljofre-vv5dev/testing/date-handling/web-services/v2-baseline-audit.md`).
 
-| ID         | Config | Record Source | Forms Stored Value                  | Expected API Return                  | Status | Actual                   | Bugs | Notes                                                 |
-| ---------- | :----: | ------------- | ----------------------------------- | ------------------------------------ | :----: | ------------------------ | ---- | ----------------------------------------------------- |
-| ws-2-A-BRT |   A    | 000080 (BRT)  | `"2026-03-15"`                      | `"2026-03-15T00:00:00Z"`             |  PASS  | `"2026-03-15T00:00:00Z"` |      | getForms serializes date-only → datetime+Z; H-2 ✓     |
-| ws-2-B-BRT |   B    | 000080 (BRT)  | (not set)                           | `null`                               |  PASS  | `null`                   |      | Unset field returns null                              |
-| ws-2-C-BRT |   C    | 000080 (BRT)  | (not set)                           | `null`                               |  PASS  | `null`                   |      | Unset field returns null                              |
-| ws-2-D-BRT |   D    | 000080 (BRT)  | `"2026-03-15T00:00:00"`             | `"2026-03-15T00:00:00Z"` (real Z)    |  PASS  | `"2026-03-15T00:00:00Z"` |      | No fake Z — H-2 confirmed; getForms serializes with Z |
-| ws-2-E-BRT |   E    | 000080 (BRT)  | (not set)                           | `null`                               |  PASS  | `null`                   |      | Legacy unset = null                                   |
-| ws-2-F-BRT |   F    | 000080 (BRT)  | (not set)                           | `null`                               |  PASS  | `null`                   |      | Legacy unset = null                                   |
-| ws-2-G-BRT |   G    | 000080 (BRT)  | (not set)                           | `null`                               |  PASS  | `null`                   |      | Legacy unset = null                                   |
-| ws-2-H-BRT |   H    | 000080 (BRT)  | (not set)                           | `null`                               |  PASS  | `null`                   |      | Legacy unset = null                                   |
+| ID         | Config | Record Source  | Forms Stored Value                  | Expected API Return                  | Status | Actual                   | Bugs | Notes                                                 |
+| ---------- | :----: | -------------- | ----------------------------------- | ------------------------------------ | :----: | ------------------------ | ---- | ----------------------------------------------------- |
+| ws-2-A-BRT |   A    | baseline (BRT) | `"2026-03-15"`                      | `"2026-03-15T00:00:00Z"`             |  PASS  | `"2026-03-15T00:00:00Z"` |      | getForms serializes date-only → datetime+Z; H-2 ✓     |
+| ws-2-B-BRT |   B    | baseline (BRT) | `"2026-03-15"`                      | `"2026-03-15T00:00:00Z"`             |  PASS  | `"2026-03-15T00:00:00Z"` |      | Date-only, ignoreTimezone=true; same serialization    |
+| ws-2-C-BRT |   C    | baseline (BRT) | `"2026-03-15T14:30:00"`             | `"2026-03-15T14:30:00Z"`             |  PASS  | `"2026-03-15T14:30:00Z"` |      | DateTime — time preserved; Z appended on read         |
+| ws-2-D-BRT |   D    | baseline (BRT) | `"2026-03-15T14:30:00"`             | `"2026-03-15T14:30:00Z"`             |  PASS  | `"2026-03-15T14:30:00Z"` |      | Real Z (no fake Z — H-2 confirmed); getForms serializes with Z |
+| ws-2-E-BRT |   E    | baseline (BRT) | `"2026-03-15"`                      | `"2026-03-15T00:00:00Z"`             |  PASS  | `"2026-03-15T00:00:00Z"` |      | Legacy date-only; API returns datetime+Z              |
+| ws-2-F-BRT |   F    | baseline (BRT) | `"2026-03-15"`                      | `"2026-03-15T00:00:00Z"`             |  PASS  | `"2026-03-15T00:00:00Z"` |      | Legacy date-only + ignoreTimezone; same format        |
+| ws-2-G-BRT |   G    | baseline (BRT) | `"2026-03-15T14:30:00"`             | `"2026-03-15T14:30:00Z"`             |  PASS  | `"2026-03-15T14:30:00Z"` |      | Legacy DateTime; time preserved                       |
+| ws-2-H-BRT |   H    | baseline (BRT) | `"2026-03-15T14:30:00"`             | `"2026-03-15T14:30:00Z"`             |  PASS  | `"2026-03-15T14:30:00Z"` |      | Legacy DateTime + ignoreTimezone; same format         |
 | ws-2-A-IST |   A    | 000084 (IST)  | `"2026-03-14"` (FORM-BUG-7: -1 day) | `"2026-03-14T00:00:00Z"` (bug in DB) |  PASS  | `"2026-03-14T00:00:00Z"` | #7   | API confirms wrong date in storage; H-7 ✓             |
 | ws-2-B-IST |   B    | 000084 (IST)  | (not set)                           | `null`                               |  PASS  | `null`                   |      | Unset                                                 |
 | ws-2-C-IST |   C    | 000084 (IST)  | (not set)                           | `null`                               |  PASS  | `null`                   |      | Unset                                                 |
