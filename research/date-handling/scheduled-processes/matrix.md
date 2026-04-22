@@ -75,6 +75,8 @@ Platform-scope suffix applies: `sp-1-midnight.custTZ-UTC`, `sp-3-archive.custTZ-
 
 ## SP-1. SP Trigger Firing Window
 
+> **Status (2026-04-22): DEFERRED** — not part of the first execution wave. Firing-window observation requires a multi-hour window (≥24h for "daily at 02:00" slots) and cannot be validated via the synchronous `run-sp-test.js` runner. Planned execution path: deploy a minute-granular probe SP (`sp-1-hourly-*`) with a file- or log-based fire-time sink, observe ≥2 consecutive fires, then backfill the daily slots via manual spike. Tracking only — no blocker for SP-2/SP-4. Revisit after SP-2/SP-4 baseline lands.
+
 **Question**: A Scheduled Process configured to run "daily at 02:00" — is "02:00" in Customer TZ, harness `TZ` env, or SQL OS TZ? This determines whether a Brazilian customer with `Customer TZ = BRT` has SPs firing at Brazilian wall-clock 02:00 or UTC 02:00 (23:00 BRT previous day).
 
 **Method**: Create a lightweight SP scheduled "daily at 02:00". Log the exact fire time. Compare against wall-clock in Customer TZ.
@@ -101,18 +103,38 @@ Platform-scope suffix applies: `sp-1-midnight.custTZ-UTC`, `sp-3-archive.custTZ-
 
 **Shape**: 2 Customer TZs × 2 mechanisms (Node, SQL) = 4 slots.
 
-| Test ID          | Customer TZ | Mechanism                  | Expected value                                            | What we learn                                        | Status  | Run Date | Evidence |
-| ---------------- | ----------- | -------------------------- | --------------------------------------------------------- | ---------------------------------------------------- | ------- | -------- | -------- |
-| sp-2-now-utc     | UTC         | `new Date().toISOString()` | UTC wall-clock                                            | Harness `TZ` env vs Customer TZ disagreement         | PENDING | —        | —        |
-| sp-2-now-brt     | BRT         | `new Date().toISOString()` | UTC wall-clock (Node always returns UTC from toISOString) | Separate: `new Date().toString()` vs `toISOString()` | PENDING | —        | —        |
-| sp-2-getdate-utc | UTC         | SQL `GETDATE()`            | SQL Server OS TZ (not Customer TZ)                        | Confirm SQL OS independence                          | PENDING | —        | —        |
-| sp-2-getdate-brt | BRT         | SQL `GETDATE()`            | SQL Server OS TZ (same SQL server on both customers)      | Confirm SQL OS independence                          | PENDING | —        | —        |
+| Test ID          | Customer TZ | Mechanism                              | Expected value (format template)                                                                                                               | What we learn                                                                  | Status  | Run Date | Evidence |
+| ---------------- | ----------- | -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ | ------- | -------- | -------- |
+| sp-2-now-utc     | UTC         | `new Date().toISOString()`             | `<YYYY-MM-DDTHH:mm:ss.SSSZ>` = current UTC wall-clock ± ≤2s run latency                                                                        | `toISOString()` is TZ-invariant — compare vs `toString()` and `process.env.TZ` | PENDING | —        | —        |
+| sp-2-now-brt     | BRT         | `new Date().toISOString()`             | `<YYYY-MM-DDTHH:mm:ss.SSSZ>` = current UTC wall-clock (identical shape to utc slot)                                                            | Customer TZ does NOT shift `toISOString()` output                              | PENDING | —        | —        |
+| sp-2-getdate-utc | UTC         | SQL `GETDATE()` via `customQuery.post` | `<YYYY-MM-DD HH:mm:ss.SSS>` in SQL OS TZ (no TZ marker — naive local)                                                                          | Confirm SQL OS independence from Customer TZ                                   | PENDING | —        | —        |
+| sp-2-getdate-brt | BRT         | SQL `GETDATE()` via `customQuery.post` | `<YYYY-MM-DD HH:mm:ss.SSS>` in SQL OS TZ — **byte-identical shape to sp-2-getdate-utc** when probed within the same second (shared SQL server) | Confirm SQL OS is shared across customers — Customer TZ does not reach SQL     | PENDING | —        | —        |
 
-> **Expected finding (hypothesis)**: `DateTime.Now` follows harness `TZ` env var (`America/Sao_Paulo` if harness runs local, `UTC` on AWS). `GETDATE()` follows SQL OS TZ regardless of Customer TZ. If confirmed, **Customer TZ is effectively display-only** for server-generated timestamps in SPs — matching the expected WS-13 finding.
+> **Expected finding (hypothesis)**: `new Date().toISOString()` always returns UTC wall-clock regardless of Customer TZ or harness `process.env.TZ` (Node spec-guaranteed). The companion `new Date().toString()` output WILL shift with `process.env.TZ` (captured in SP-4). `GETDATE()` follows SQL OS TZ only — same SQL server on both customers → both `sp-2-getdate-*` slots return a naive datetime in the same TZ. If confirmed, **Customer TZ is effectively display-only** for server-generated timestamps in SPs — matching the expected WS-13 finding.
+>
+> **Format conventions**:
+>
+> - Node output: ISO-8601 with millisecond precision and trailing `Z` (e.g. `2026-04-22T14:35:12.418Z`).
+> - SQL output: SQL Server default `datetime` ToString — `YYYY-MM-DD HH:mm:ss.SSS`, no TZ marker, representing naive local time of the SQL OS (likely UTC-7 on vv5dev's DB host — needs confirmation).
+>
+> **Tolerance**: ±2 seconds between capture and expected, to absorb cron-jitter and network round-trip.
+
+#### V2-scope baseline (EmanuelJofre-vv5dev, DB-scope "Use Updated Calendar Control Logic" = ON)
+
+V2 expected values are **identical to V1** — `useUpdatedCalendarValueLogic` is Forms-only (confirmed in [`../forms-calendar/CLAUDE.md`](../forms-calendar/CLAUDE.md) and validated 2026-04-22 via WS V1/V2 parity run, `b18dbfdb`/`f36b65dd`). SP script execution does not traverse the Angular calendar pipeline, so the toggle cannot affect `DateTime.Now` or `GETDATE()` output. Listed below for parity tracking / regression-run completeness only.
+
+| Test ID             | Customer TZ | Mechanism                  | Expected (V2 ≡ V1)                                              | Note                               | Status  | Run Date | Evidence |
+| ------------------- | ----------- | -------------------------- | --------------------------------------------------------------- | ---------------------------------- | ------- | -------- | -------- |
+| sp-2-now-utc.V2     | UTC         | `new Date().toISOString()` | `<YYYY-MM-DDTHH:mm:ss.SSSZ>` (identical to sp-2-now-utc)        | Parity slot — toggle is Forms-only | PENDING | —        | —        |
+| sp-2-now-brt.V2     | BRT         | `new Date().toISOString()` | `<YYYY-MM-DDTHH:mm:ss.SSSZ>` (identical to sp-2-now-brt)        | Parity slot — toggle is Forms-only | PENDING | —        | —        |
+| sp-2-getdate-utc.V2 | UTC         | SQL `GETDATE()`            | `<YYYY-MM-DD HH:mm:ss.SSS>` SQL OS TZ (identical to V1 sibling) | Parity slot — toggle is Forms-only | PENDING | —        | —        |
+| sp-2-getdate-brt.V2 | BRT         | SQL `GETDATE()`            | `<YYYY-MM-DD HH:mm:ss.SSS>` SQL OS TZ (identical to V1 sibling) | Parity slot — toggle is Forms-only | PENDING | —        | —        |
 
 ---
 
 ## SP-3. Service Task Firing Window
+
+> **Status (2026-04-22): DEFERRED — document-only.** Service Task schedules are built-in and uncontrollable; observation windows are ≥24h and not suitable for regression-run automation. Planned execution path: one-shot manual spike per Service Task (set up an expiration/archive condition at a known Customer-TZ wall-clock, observe the next fire, document the TZ behaviour in this matrix). No status rollup or generator support expected — evidence lives in session-bound `results.md` entries under the project testing folder.
 
 **Question**: Central Admin Service Tasks (`Document Archive`, `Document Expiration`, `Document Review`, `Reindex suspect documents`, `User Expiration`, `User Password Expiration`, `Warning Task Escalation`, `Deadline Task Escalation`, etc.) run on schedules we don't control directly. Do they fire in Customer TZ or another TZ? And does Customer TZ change mid-day affect the next firing?
 
@@ -140,12 +162,31 @@ Platform-scope suffix applies: `sp-1-midnight.custTZ-UTC`, `sp-3-archive.custTZ-
 
 **Shape**: 2 slots — one per Customer TZ.
 
-| Test ID            | Customer TZ | Script logs                                             | Status  | Run Date | Evidence |
-| ------------------ | ----------- | ------------------------------------------------------- | ------- | -------- | -------- |
-| sp-4-tz-report-utc | UTC         | Node TZ, SQL GETDATE, Customer TZ (from getUserContext) | PENDING | —        | —        |
-| sp-4-tz-report-brt | BRT         | Same                                                    | PENDING | —        | —        |
+| Test ID            | Customer TZ | Script logs                                             | Expected values (per log field)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | Status  | Run Date | Evidence |
+| ------------------ | ----------- | ------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- | -------- | -------- |
+| sp-4-tz-report-utc | UTC         | Node TZ, SQL GETDATE, Customer TZ (from getUserContext) | `process.env.TZ`: `"UTC"` if preprod/AWS (hypothesis) — may be unset (then Intl default). `new Date().toString()`: `<EEE MMM DD YYYY HH:mm:ss GMT±HHMM (Zone)>` reflecting `process.env.TZ` — e.g. `"Wed Apr 22 2026 14:35:12 GMT+0000 (Coordinated Universal Time)"`. `new Date().toISOString()`: `<YYYY-MM-DDTHH:mm:ss.SSSZ>` UTC. `GETDATE()`: `<YYYY-MM-DD HH:mm:ss.SSS>` in SQL OS TZ (likely UTC-7 for vv5dev DB host). `getUserContext().customerTimeZone` (or equivalent): `"UTC"` / offset `0`.       | PENDING | —        | —        |
+| sp-4-tz-report-brt | BRT         | Same triple as utc slot                                 | `process.env.TZ`: same harness value as utc slot (same preprod node) — NOT `"America/Sao_Paulo"` unless run locally. `new Date().toString()`: identical shape to utc slot (harness TZ is shared across customers). `new Date().toISOString()`: `<YYYY-MM-DDTHH:mm:ss.SSSZ>` UTC — matches utc slot within ±2s. `GETDATE()`: byte-identical to sp-4-tz-report-utc at same moment (shared SQL). `getUserContext().customerTimeZone`: `"America/Sao_Paulo"` / offset `-3` (or VV's enum — confirm via first run). | PENDING | —        | —        |
 
 > **Key question**: Does the harness's `TZ` env var differ between the vv5dev preprod instance and the vvdemo instance? If yes, the TZ discrepancy between a customer's scripts running on "the same" harness is actually three-fold (Customer TZ, harness TZ, SQL OS TZ). Document for customer-support playbooks.
+>
+> **Format conventions** (same as SP-2):
+>
+> - `new Date().toString()` — JS default, zone-aware: `<EEE MMM DD YYYY HH:mm:ss GMT±HHMM (zone-name)>`.
+> - `new Date().toISOString()` — always UTC, `<YYYY-MM-DDTHH:mm:ss.SSSZ>`.
+> - `GETDATE()` — SQL default, naive: `<YYYY-MM-DD HH:mm:ss.SSS>`.
+> - `process.env.TZ` — IANA zone string or empty.
+> - `getUserContext()` Customer TZ field name and value format TBD — first run should capture the exact key/value shape; replace the template above with the observed canonical string.
+>
+> **Assumptions flagged for validation**: (a) vv5dev preprod harness has `TZ=UTC` — unverified, first run supplies evidence; (b) SQL OS TZ is UTC-7 (Mountain, Phoenix) shared across customers — unverified; (c) the `getUserContext` helper exposes Customer TZ under a key like `customerTimeZone` or `timezone` — exact key TBD.
+
+#### V2-scope baseline (EmanuelJofre-vv5dev, DB-scope "Use Updated Calendar Control Logic" = ON)
+
+V2 expected values are **identical to V1** — `useUpdatedCalendarValueLogic` is Forms-only; SP script execution bypasses the Angular calendar pipeline. Listed for parity tracking / regression-run completeness only.
+
+| Test ID               | Customer TZ | Script logs           | Expected (V2 ≡ V1)                   | Note                               | Status  | Run Date | Evidence |
+| --------------------- | ----------- | --------------------- | ------------------------------------ | ---------------------------------- | ------- | -------- | -------- |
+| sp-4-tz-report-utc.V2 | UTC         | Same triple as utc V1 | Byte-identical to sp-4-tz-report-utc | Parity slot — toggle is Forms-only | PENDING | —        | —        |
+| sp-4-tz-report-brt.V2 | BRT         | Same triple as brt V1 | Byte-identical to sp-4-tz-report-brt | Parity slot — toggle is Forms-only | PENDING | —        | —        |
 
 ---
 
