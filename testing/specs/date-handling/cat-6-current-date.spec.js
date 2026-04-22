@@ -53,32 +53,70 @@ for (const tc of categoryTests) {
             // V1 stores a Date object; V2 stores an ISO string. Normalize to a Date for
             // semantic comparison (the test is about WHAT date is stored, not HOW it is
             // serialized). rawType is recorded as an annotation for observability.
-            const values = await page.evaluate((name) => {
-                const raw = VV.Form.VV.FormPartition.getValueObjectValue(name);
-                const api = VV.Form.GetFieldValue(name);
-                const now = new Date();
-                const toDate = (v) => {
-                    if (v instanceof Date) return v;
-                    if (typeof v === 'string' && v.length) {
-                        const d = new Date(v);
-                        return isNaN(d.getTime()) ? null : d;
-                    }
-                    return null;
-                };
-                const rawDate = toDate(raw);
-                const apiDate = toDate(api);
-                const fmt = (d) =>
-                    d ? d.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' }) : null;
-                return {
-                    rawType: raw instanceof Date ? 'Date' : typeof raw,
-                    rawIso: rawDate ? rawDate.toISOString() : null,
-                    apiType: api instanceof Date ? 'Date' : typeof api,
-                    apiIso: apiDate ? apiDate.toISOString() : String(api),
-                    todayLocal: fmt(now),
-                    rawLocalDate: fmt(rawDate),
-                    apiLocalDate: fmt(apiDate),
-                };
-            }, currentDateField);
+            // Map test-TZ label to IANA zone name.
+            const TZ_IANA = {
+                BRT: 'America/Sao_Paulo',
+                IST: 'Asia/Kolkata',
+                UTC0: 'UTC',
+                PST: 'America/Los_Angeles',
+            };
+            const ianaTz = TZ_IANA[tc.tz] || 'UTC';
+
+            // TZ comparison under Playwright emulation is tricky:
+            //   - Node's `new Date()` returns real host UTC.
+            //   - Chromium's `new Date()` in page.evaluate also returns real UTC
+            //     (Emulation.setTimezoneOverride affects toLocaleString, NOT Date.now).
+            //   - VV's current-date pipeline under V2 stores the local wall-clock
+            //     time SERIALIZED AS Z (the "fake-Z" pattern), so rawIso literally
+            //     encodes the local date+time regardless of real UTC.
+            // Consequence: for V2 entries we must NOT re-convert rawIso through a
+            // timezone — its date portion IS the local date. For V1 (Date object)
+            // entries the classic toLocaleDateString(tz) works.
+            const values = await page.evaluate(
+                ({ name, tz, scope }) => {
+                    const raw = VV.Form.VV.FormPartition.getValueObjectValue(name);
+                    const api = VV.Form.GetFieldValue(name);
+                    const now = new Date();
+                    const toDate = (v) => {
+                        if (v instanceof Date) return v;
+                        if (typeof v === 'string' && v.length) {
+                            const d = new Date(v);
+                            return isNaN(d.getTime()) ? null : d;
+                        }
+                        return null;
+                    };
+                    const rawDate = toDate(raw);
+                    const apiDate = toDate(api);
+                    // V2 fake-Z serialization: the raw string's date portion is the
+                    // local calendar date. Extract directly without any TZ conversion.
+                    const extractV2LocalDate = (s) => {
+                        if (typeof s !== 'string') return null;
+                        const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+                        return m ? `${m[2]}/${m[3]}/${m[1]}` : null;
+                    };
+                    const fmtTz = (d) =>
+                        d
+                            ? d.toLocaleDateString('en-US', {
+                                  month: '2-digit',
+                                  day: '2-digit',
+                                  year: 'numeric',
+                                  timeZone: tz,
+                              })
+                            : null;
+                    const fmt = (dateObj, isoStr) =>
+                        scope === 'V2' && typeof isoStr === 'string' ? extractV2LocalDate(isoStr) : fmtTz(dateObj);
+                    return {
+                        rawType: raw instanceof Date ? 'Date' : typeof raw,
+                        rawIso: rawDate ? rawDate.toISOString() : null,
+                        apiType: api instanceof Date ? 'Date' : typeof api,
+                        apiIso: apiDate ? apiDate.toISOString() : String(api),
+                        todayLocal: fmtTz(now),
+                        rawLocalDate: fmt(rawDate, typeof raw === 'string' ? raw : null),
+                        apiLocalDate: fmt(apiDate, typeof api === 'string' ? api : null),
+                    };
+                },
+                { name: currentDateField, tz: ianaTz, scope: entryScope }
+            );
 
             // Record storage-type observations so we can spot format drift across builds
             testInfo.annotations.push({ type: 'rawType', description: String(values.rawType) });

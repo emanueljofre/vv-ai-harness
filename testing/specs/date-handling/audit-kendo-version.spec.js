@@ -17,7 +17,7 @@
  */
 const { test, expect } = require('@playwright/test');
 const { FIELD_MAP, FORM_TEMPLATE_URL } = require('../../fixtures/vv-config');
-const { gotoAndWaitForVVForm, setFieldValue } = require('../../helpers/vv-form');
+const { gotoAndWaitForVVForm, setFieldValue, getCodePath } = require('../../helpers/vv-form');
 
 // Only run on BRT-chromium — pure JS logic, one TZ/browser is sufficient
 test.beforeEach(async ({ page }, testInfo) => {
@@ -115,6 +115,19 @@ test.describe('Phase 1: VV Form Framework', () => {
 // and compares widget behavior between v1 and v2.
 
 test.describe('Phase 2: Kendo Widget Internals', () => {
+    // Phases 2/3/3b probe the Kendo v1 global API (`window.kendo`). On V2 envs
+    // the global is not exposed (Kendo v2 uses a different loading pattern),
+    // so these tests are structurally incompatible — skip cleanly instead of
+    // failing. The V2 equivalents are documented separately via the form-fields
+    // reference and live in cat-15 (V2-aware).
+    test.beforeEach(async ({ page }) => {
+        // V2 exposes a `kendo` global too, so `typeof kendo` is truthy on both — but
+        // the v2 API is not compatible with the probes below. Skip based on the V2
+        // calendar-logic flag instead, which is the real V1/V2 switch.
+        const isV2 = await getCodePath(page);
+        test.skip(isV2, 'Phase 2/3/3b probe Kendo v1 internals — skipping on V2 env');
+    });
+
     test('Kendo version and global kendo object', async ({ page }) => {
         const kendoInfo = await page.evaluate(() => ({
             kendoVersion: typeof kendo !== 'undefined' ? kendo.version : null,
@@ -199,6 +212,14 @@ const PARSE_CASES = [
 ];
 
 test.describe('Phase 3: Kendo Date Parsing', () => {
+    test.beforeEach(async ({ page }) => {
+        // V2 exposes a `kendo` global too, so `typeof kendo` is truthy on both — but
+        // the v2 API is not compatible with the probes below. Skip based on the V2
+        // calendar-logic flag instead, which is the real V1/V2 switch.
+        const isV2 = await getCodePath(page);
+        test.skip(isV2, 'Phase 2/3/3b probe Kendo v1 internals — skipping on V2 env');
+    });
+
     for (const tc of PARSE_CASES) {
         test(`kendo.parseDate("${tc.input}") — ${tc.label}`, async ({ page }) => {
             const result = await page.evaluate((input) => {
@@ -228,6 +249,14 @@ test.describe('Phase 3: Kendo Date Parsing', () => {
 });
 
 test.describe('Phase 3b: Kendo Date Formatting', () => {
+    test.beforeEach(async ({ page }) => {
+        // V2 exposes a `kendo` global too, so `typeof kendo` is truthy on both — but
+        // the v2 API is not compatible with the probes below. Skip based on the V2
+        // calendar-logic flag instead, which is the real V1/V2 switch.
+        const isV2 = await getCodePath(page);
+        test.skip(isV2, 'Phase 2/3/3b probe Kendo v1 internals — skipping on V2 env');
+    });
+
     test('kendo.toString() with known Date object', async ({ page }) => {
         const result = await page.evaluate(() => {
             // Create a fixed date: March 15, 2026 14:30:00 local time

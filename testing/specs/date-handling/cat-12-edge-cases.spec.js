@@ -32,12 +32,6 @@ for (const tc of categoryTests) {
             // Only run this test in the matching timezone project
             test.skip(!testInfo.project.name.startsWith(tc.tz), `Skipping — test is for ${tc.tz}`);
 
-            // Empty/null/invalid inputs: under V2, VV.Form.SetFieldValue(name, '' | null) never
-            // resolves — the page.evaluate stalls indefinitely. Cap this test at 15s so the hang
-            // is recorded as a fast failure (V2 observation) instead of eating the default 60s.
-            const isEdgeInput = tc.inputDateStr === '' || tc.inputDateStr === null || tc.inputDateStr === 'not-a-date';
-            if (isEdgeInput) test.setTimeout(15000);
-
             // Navigate to fresh form and wait for VV.Form ready
             await gotoAndWaitForVVForm(page, FORM_TEMPLATE_URL);
 
@@ -45,7 +39,6 @@ for (const tc of categoryTests) {
             const dateStr = await getBrowserTimezone(page);
             expect(dateStr).toContain(tc.tzOffset);
 
-            // Verify code path (V1 vs V2)
             // Verify code path (V1 vs V2) and skip if entry scope does not match.
             // Entries default to V1 scope; .V2 entries set `scope: 'V2'`. V1 and V2
             // coexist in TEST_DATA for the same category so we can track both
@@ -54,6 +47,13 @@ for (const tc of categoryTests) {
             const envScope = isV2 ? 'V2' : 'V1';
             const entryScope = tc.scope || 'V1';
             test.skip(envScope !== entryScope, `Entry scope=${entryScope} but active env is ${envScope}`);
+
+            // Empty/null/invalid inputs on V1: SFV returns quickly but GFV hits FORM-BUG-6
+            // ("Invalid Date") — default 60s timeout is fine.
+            // On V2: FORM-BUG-8 causes SFV(empty|null) to hang forever. This branch is
+            // unreachable now (V1-only entries are skipped above), but if V2 siblings are
+            // added later, wrap the SFV call with Promise.race rather than capping the
+            // whole-test timeout (see previous version for the 15s cap approach).
             const fieldCfg = FIELD_MAP[tc.config];
 
             // Verify field
