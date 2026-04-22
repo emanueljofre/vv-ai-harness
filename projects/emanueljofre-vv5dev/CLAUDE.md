@@ -62,6 +62,8 @@ V2 date-handling baseline — execution data in `testing/date-handling/`:
 - [`testing/date-handling/failures.md`](testing/date-handling/failures.md) — per-failure Expected vs Received table
 - [`testing/date-handling/failures.json`](testing/date-handling/failures.json) — structured failure data
 - [`testing/date-handling/regression-results-latest.json`](testing/date-handling/regression-results-latest.json) — custom-reporter structured output (per-TC status + actual values + `buildContext.fingerprint`)
+- [`testing/date-handling/v2-baseline-audit.md`](testing/date-handling/v2-baseline-audit.md) — V1-vs-V2 diff audit with verdicts (IDENTICAL / FORMAT_ONLY / SAME_LOCAL_DATE / KNOWN_BUG_PERSISTS / UNFLAGGED_DIFFERENCE). Regenerate with `npm run audit:v2 -- --project EmanuelJofre-vv5dev --write`.
+- 📋 [`testing/date-handling/v2-review-queue.md`](testing/date-handling/v2-review-queue.md) — **6 entries pending manual review** (tag-or-revert decision). Must be resolved before the V2 baseline is considered complete.
 - `testing/date-handling/full-log.log` — raw playwright output
 
 ### Build timeline
