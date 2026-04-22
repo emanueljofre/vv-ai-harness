@@ -318,7 +318,17 @@ for (const r of results.results) {
 
     let verdict = cls.verdict;
     if (verdict === 'SEMANTIC_DIFF' || verdict === 'NEW_IN_V2' || verdict === 'MISSING_IN_V2') {
-        verdict = knownBugHit ? 'KNOWN_BUG_PERSISTS' : 'UNFLAGGED_DIFFERENCE';
+        // Trust the pipeline's per-action classifier (ws-matrix-compare.js) when it
+        // stamped the row as passing — it knows WS-6 cleared-state and WS-8 query
+        // verdicts, plus null-equivalence for rejected formats. The audit's literal
+        // classify() can't see these semantics and would otherwise flag them as
+        // UNFLAGGED_DIFFERENCE. Only override the diff-family verdicts — leave
+        // IDENTICAL / FORMAT_ONLY / SAME_LOCAL_DATE alone.
+        if (r.status === 'passed') {
+            verdict = 'IDENTICAL';
+        } else {
+            verdict = knownBugHit ? 'KNOWN_BUG_PERSISTS' : 'UNFLAGGED_DIFFERENCE';
+        }
     }
 
     audits.push({
