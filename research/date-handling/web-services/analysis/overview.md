@@ -10,6 +10,8 @@
 
 **Cross-environment validation (2026-04-10)**: All 10 categories re-executed against WADNR (vv5dev / fpOnline) using `zzzDate Test Harness`. API-only categories (WS-1/2/3/5/6/7/8/9) and browser verification (WS-4) produce identical results. All 6 bugs confirmed as platform-level defects, not environment-specific. FORM-BUG-7 also confirmed via IST browser record on WADNR. See `runs/wadnr-full-run-2026-04-10.md`.
 
+**V2 baseline validation (2026-04-22 · vv5dev / EmanuelJofre, build fingerprint `f36b65dd`)**: 105-slot regression re-run against the `Date Test Harness` form under the V2 code path (`useUpdatedCalendarValueLogic=true` at DB scope). Auto-classified via [`tools/analysis/audit-ws-v2.js`](../../../../tools/analysis/audit-ws-v2.js): **59 IDENTICAL / 1 KNOWN_BUG_PERSISTS / 15 UNFLAGGED / 4 NOT_IN_MATRIX**. The single KNOWN_BUG is FORM-BUG-7 surfacing through a legacy IST-saved reference record; the 15 UNFLAGGED are all WS-2 pipeline artifacts (the pipeline reads a freshly-WS-1-created record whose configs don't match the WADNR-era reference records the V1 matrix was baselined against); the 4 NOT_IN_MATRIX are harness summary rows with no stored value (benign). **No V2 regression on the API write path.** 17 newly-observed variants (WS-9 Config C + UTC, WS-5/7 summary rows) landed as a V2 Baseline Additions section in [`matrix.md`](../matrix.md). Full report: [`projects/emanueljofre-vv5dev/testing/date-handling/web-services/v2-baseline-audit.md`](../../../../projects/emanueljofre-vv5dev/testing/date-handling/web-services/v2-baseline-audit.md).
+
 ---
 
 ## 2. Scope
