@@ -23,24 +23,12 @@ const { fingerprint } = require('../../tools/helpers/build-fingerprint');
 const { buildWsSlotId } = require('../../tools/helpers/ws-slot-id');
 const { parseMatrixExpected, classifyRow } = require('../../tools/helpers/ws-matrix-compare');
 const { WS_TEMPLATE_NAME } = require('../fixtures/ws-config');
-const { vvConfig } = require('../fixtures/vv-config');
+const { resolveResultsPath } = require('../../tools/helpers/ws-results-path');
 
 const REPO_ROOT = path.resolve(__dirname, '..', '..');
 const RUNNER_PATH = path.join(REPO_ROOT, 'tools', 'runners', 'run-ws-test.js');
 const GENERATOR_PATH = path.join(REPO_ROOT, 'tools', 'generators', 'generate-ws-artifacts.js');
 const MATRIX_PATH = path.join(REPO_ROOT, 'research', 'date-handling', 'web-services', 'matrix.md');
-
-// Route raw results to the active customer's project folder (personal/env-bound data).
-// Falls back to testing/tmp/ if no projects/{customer}/ folder exists.
-function resolveResultsPath() {
-    const customerKey = vvConfig.customerKey || vvConfig.customerAlias;
-    const projectSlug = customerKey ? customerKey.toLowerCase() : null;
-    const projectDir = projectSlug ? path.join(REPO_ROOT, 'projects', projectSlug) : null;
-    if (projectDir && fs.existsSync(projectDir)) {
-        return path.join(projectDir, 'testing', 'date-handling', 'web-services', 'ws-regression-results-latest.json');
-    }
-    return path.join(REPO_ROOT, 'testing', 'tmp', 'ws-regression-results-latest.json');
-}
 
 const RESULTS_PATH = resolveResultsPath();
 const RESULTS_DIR = path.dirname(RESULTS_PATH);
@@ -406,7 +394,7 @@ async function main() {
     console.log('\n=== Phase 2: Generating artifacts ===\n');
 
     try {
-        execSync(`node ${GENERATOR_PATH}`, {
+        execSync(`node ${GENERATOR_PATH} --input ${RESULTS_PATH}`, {
             cwd: REPO_ROOT,
             stdio: 'inherit',
         });

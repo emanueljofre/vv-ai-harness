@@ -21,6 +21,7 @@ const fs = require('fs');
 const path = require('path');
 const { buildWsSlotId } = require('../helpers/ws-slot-id');
 const { parseMatrixExpected, classifyRow } = require('../helpers/ws-matrix-compare');
+const { resolveResultsPath } = require('../helpers/ws-results-path');
 
 const REPO_ROOT = path.resolve(__dirname, '..', '..');
 const ARTIFACTS_DIR = path.join(REPO_ROOT, 'research', 'date-handling', 'web-services');
@@ -28,7 +29,9 @@ const RUNS_DIR = path.join(ARTIFACTS_DIR, 'runs');
 const SUMMARIES_DIR = path.join(ARTIFACTS_DIR, 'summaries');
 const MATRIX_PATH = path.join(ARTIFACTS_DIR, 'matrix.md');
 const RESULTS_PATH = path.join(ARTIFACTS_DIR, 'results.md');
-const DEFAULT_INPUT = path.join(REPO_ROOT, 'testing', 'tmp', 'ws-regression-results-latest.json');
+// Mirrors the pipeline's write location — per-customer projects/ folder when
+// present, fallback to testing/tmp/. Overridable via --input.
+const DEFAULT_INPUT = resolveResultsPath();
 
 const TZ_MAP = {
     BRT: { iana: 'America/Sao_Paulo', offset: 'UTC-3', short: 'BRT' },
@@ -47,6 +50,13 @@ function main() {
         console.error(`Results file not found: ${inputPath}`);
         console.error('Run tests first: node testing/pipelines/run-ws-regression.js --tz BRT');
         process.exit(1);
+    }
+
+    // Artifact dirs are created on demand — they don't pre-exist in a fresh
+    // checkout and aren't tracked until populated.
+    if (!dryRun) {
+        fs.mkdirSync(RUNS_DIR, { recursive: true });
+        fs.mkdirSync(SUMMARIES_DIR, { recursive: true });
     }
 
     const data = JSON.parse(fs.readFileSync(inputPath, 'utf8'));
@@ -320,7 +330,9 @@ Monitor for platform changes.
 }
 
 function appendResultsSession(today, entries) {
-    let content = fs.readFileSync(RESULTS_PATH, 'utf8');
+    let content = fs.existsSync(RESULTS_PATH)
+        ? fs.readFileSync(RESULTS_PATH, 'utf8')
+        : '# WS Regression Session Index\n';
     const header = `\n## Session ${today} (WS Regression Pipeline)\n\n**Purpose**: Automated regression verification of all WS test cases.\n**Key outcomes**: ${entries.length} tests documented.\n\n`;
     content += header + entries.join('\n') + '\n';
     fs.writeFileSync(RESULTS_PATH, content);
