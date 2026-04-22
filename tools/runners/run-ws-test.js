@@ -52,7 +52,9 @@ function parseArgs() {
 WS Test Harness Runner
 
 Options:
-  --action <WS-1..WS-9>     Required. Test category to run.
+  --action <WS-1..WS-10a>   Required. Test category to run. WS-10a is the
+                             pipeline-tagged variant of WS-10 (postForms vs
+                             forminstance/) that emits matrix-matching tcIds.
   --configs <A,C,D|ALL>      Target configs. Default: ALL.
   --record-id <name>         Record instance name (for WS-2, WS-3).
   --input-date <date>        Date string to write (for WS-1, WS-3).

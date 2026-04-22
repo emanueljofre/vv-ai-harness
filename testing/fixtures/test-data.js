@@ -10239,6 +10239,30 @@ const TEST_DATA = [
         notes: 'V2 regression signal: 8 round-trips yield zero drift (BUG-5 fix confirmed across multiple trips). V1 lost 24 hours over 8 trips; V2 is stable.',
         tcRef: 'research/date-handling/forms-calendar/test-cases/tc-13-multi-roundtrip-db.md',
     },
+    {
+        id: 'ws-10b-C-BRT',
+        action: 'theoretical',
+        notes: 'Browser-only (WS-10B): side-by-side postForms vs forminstance/ rawValue/GFV comparison (Freshdesk #124697). Requires verify-ws10-browser.js compare mode. Entry parked in test-data.js because task-status.js parses only this file today (tools/analysis/task-status.js:27); semantic home is testing/fixtures/ws-test-data.js.',
+        tcRef: 'research/date-handling/web-services/test-cases/tc-ws-10b-C-BRT.md',
+    },
+    {
+        id: 'ws-10b-D-BRT',
+        action: 'theoretical',
+        notes: 'Browser-only side-by-side comparison with ignoreTZ=true (Config D). Confirms CB-29 root cause. Requires verify-ws10-browser.js compare mode.',
+        tcRef: 'research/date-handling/web-services/test-cases/tc-ws-10b-D-BRT.md',
+    },
+    {
+        id: 'ws-10c-C-BRT',
+        action: 'theoretical',
+        notes: 'Browser-only save-stabilize sequence: first-open snapshot, save, reopen, resave, reopen — confirms first save commits shifted value and subsequent cycles are stable.',
+        tcRef: 'research/date-handling/web-services/test-cases/tc-ws-10c-C-BRT.md',
+    },
+    {
+        id: 'ws-10c-D-BRT',
+        action: 'theoretical',
+        notes: 'Browser-only save-stabilize — exact Freshdesk #124697 scenario (ignoreTZ=true, display flips after first save). Requires verify-ws10-browser.js save-stabilize mode.',
+        tcRef: 'research/date-handling/web-services/test-cases/tc-ws-10c-D-BRT.md',
+    },
 ];
 
 // ═══════════════════════════════════════════════════════════════════════

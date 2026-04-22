@@ -1096,15 +1096,15 @@ module.exports.main = async function (ffCollection, vvClient, response) {
         };
     }
 
-    async function actionFormInstanceCompare(targetConfigs, inputDate, isDebug) {
-        // WS-10: Compare postForms (core API) vs forminstance/ (FormsAPI) endpoints.
+    async function actionFormInstanceCompare(targetConfigs, inputDate, isDebug, actionLabel = 'WS-10') {
+        // WS-10 / WS-10a: Compare postForms (core API) vs forminstance/ (FormsAPI).
         // Freshdesk #124697: postForms-created records have time mutated on form open;
         // forminstance/-created records reportedly preserve time correctly.
         //
-        // Sub-actions (controlled by InputDate format):
-        //   WS-10A/B: Create via both endpoints, return DataIDs for browser verification.
-        //   The browser step (verify-ws10-browser.js) handles comparison and save-stabilize.
-        if (!inputDate) throw new Error('InputDate is required for WS-10');
+        // Both `WS-10` and `WS-10a` dispatch here — 10a is the pipeline-tagged alias
+        // so the artifact generator emits `ws-10a-{config}-{tz}` tcIds that match
+        // matrix slot IDs. WS-10B/WS-10C are browser-only (verify-ws10-browser.js).
+        if (!inputDate) throw new Error(`InputDate is required for ${actionLabel}`);
 
         const fieldValues = {};
         for (const configKey of targetConfigs) {
@@ -1161,7 +1161,7 @@ module.exports.main = async function (ffCollection, vvClient, response) {
         });
 
         const result = {
-            action: 'WS-10',
+            action: actionLabel,
             targetConfigs,
             inputDate,
             serverTime: new Date().toISOString(),
@@ -1239,10 +1239,11 @@ module.exports.main = async function (ffCollection, vvClient, response) {
                 output.data = await actionDateComputation(targetConfigs, inputDate, debug);
                 break;
             case 'WS-10':
-                output.data = await actionFormInstanceCompare(targetConfigs, inputDate, debug);
+            case 'WS-10a':
+                output.data = await actionFormInstanceCompare(targetConfigs, inputDate, debug, action);
                 break;
             default:
-                throw new Error(`Unknown action: '${action}'. Valid: WS-1 through WS-10`);
+                throw new Error(`Unknown action: '${action}'. Valid: WS-1 through WS-9, WS-10, WS-10a`);
         }
 
         // Enrich output with diagnostics

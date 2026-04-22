@@ -50,6 +50,16 @@ const TZ_ENV = {
     UTC0: 'UTC',
 };
 
+// Keep in sync with tools/generators/generate-ws-artifacts.js buildTcId().
+// Task-status reads tcId directly from result entries, so the pipeline must
+// emit the same IDs the generator uses for matrix correlation.
+function buildTcId({ action, config, tz, format, variant }) {
+    const a = String(action).toLowerCase();
+    if (format) return `${a}-${config}-${format}`;
+    if (variant) return `${a}-${config}-${variant}-${tz}`;
+    return `${a}-${config}-${tz}`;
+}
+
 /**
  * Define all regression test invocations.
  * Each entry is one call to run-ws-test.js with specific args.
@@ -126,6 +136,19 @@ const TEST_INVOCATIONS = [
     { action: 'WS-9', tz: 'BRT', configs: 'A,C', inputDate: '2026-03-15', extraArgs: '' },
     { action: 'WS-9', tz: 'IST', configs: 'A', inputDate: '2026-03-15', extraArgs: '' },
     { action: 'WS-9', tz: 'UTC', configs: 'A', inputDate: '2026-03-15', extraArgs: '' },
+
+    // ═══════════════════════════════════════════════════════════════
+    // WS-10a: postForms vs forminstance/ endpoint compare — 8 slots
+    // Harness creates one record via each endpoint and reads back via API.
+    // The pass/fail verdict lives in browser verification
+    // (tools/audit/verify-ws10-browser.js) — this invocation captures the
+    // API-layer evidence (storedMatch etc.) and produces the matrix tcIds.
+    // WS-10b (side-by-side) and WS-10c (save-stabilize) are browser-only;
+    // they are marked `action: 'theoretical'` in testing/fixtures/test-data.js
+    // so task-status does not surface them as actionable pending.
+    // ═══════════════════════════════════════════════════════════════
+    { action: 'WS-10a', tz: 'BRT', configs: 'A,C,D,H', inputDate: '2026-03-15T14:30:00', extraArgs: '' },
+    { action: 'WS-10a', tz: 'IST', configs: 'A,C,D,H', inputDate: '2026-03-15T14:30:00', extraArgs: '' },
 ];
 
 async function main() {
@@ -151,7 +174,7 @@ async function main() {
 
         if (invocations.length === 0) {
             console.error('No matching test invocations. Check --action and --tz filters.');
-            console.error('Available actions: WS-1 through WS-9');
+            console.error('Available actions: WS-1, WS-2, WS-3, WS-5, WS-6, WS-7, WS-8, WS-9, WS-10a');
             console.error('Available TZs: BRT, IST, UTC');
             process.exit(1);
         }
@@ -219,23 +242,44 @@ async function main() {
                     sent: r.sent,
                     // Normalize each action's "observed final value" into `stored`
                     // so downstream tooling has one field to compare against V1:
-                    //   WS-1/5/7: `stored`    (read-back after write)
-                    //   WS-2:     `apiReturn` (read-only)
+                    //   WS-1/5/7: `stored`      (read-back after write)
+                    //   WS-2:     `apiReturn`   (read-only)
                     //   WS-3:     `finalRead` → `cycle2Read` → `cycle1Read`
-                    //   WS-6:     `stored`    (post-empty-write read-back)
-                    stored: r.stored ?? r.apiReturn ?? r.finalRead ?? r.cycle2Read ?? r.cycle1Read,
+                    //   WS-6:     `stored`      (post-empty-write read-back)
+                    //   WS-10a:   `postForms.apiStored` (primary endpoint under test)
+                    stored:
+                        r.stored ??
+                        r.apiReturn ??
+                        r.finalRead ??
+                        r.cycle2Read ??
+                        r.cycle1Read ??
+                        r.postForms?.apiStored,
                     returned: r.returned ?? r.apiReturn,
                     // Preserve WS-3 cycle details for round-trip drift analysis
                     cycle1Read: r.cycle1Read,
                     cycle2Read: r.cycle2Read,
                     finalRead: r.finalRead,
                     drift: r.drift,
+                    // Preserve WS-10a endpoint comparison for browser verification
+                    postForms: r.postForms,
+                    formInstance: r.formInstance,
+                    storedMatch: r.storedMatch,
                     // Harness match is strict (sent vs stored); for regression we
                     // record the actual stored value — status is determined by the
                     // artifact generator comparing against matrix Expected values.
                     // For now, mark as 'executed' and let stored be the actual.
                     match: r.match,
                     status: 'executed',
+                    // tcId lets task-status correlate pipeline runs with matrix slots.
+                    // Mirrors tools/generators/generate-ws-artifacts.js buildTcId() —
+                    // keep the two in sync if either formula changes.
+                    tcId: buildTcId({
+                        action: inv.action,
+                        config: r.config,
+                        tz: inv.tz,
+                        format: r.format,
+                        variant: r.variant || r.pattern,
+                    }),
                     serverTime: result.data?.serverTime,
                     serverTimezone: result.data?.serverTimezone,
                     // WS-5/9 may have extra fields
