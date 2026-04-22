@@ -237,14 +237,6 @@ function fmtTs(ts) {
         .slice(0, 19);
 }
 
-function lastStatusOf(history, tc) {
-    const h = history.get(tc) || [];
-    if (!h.length) return null;
-    const recent = [...h].sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0));
-    const nonSkipped = recent.filter((e) => e.status !== 'skipped');
-    return nonSkipped[0] || recent[0] || null;
-}
-
 // Single scan of the project's JSON files — shared across all components
 const jsonFiles = findExecutions(projectDir);
 const runs = readRuns(jsonFiles);
@@ -321,24 +313,74 @@ for (const comp of componentsToRun) {
     const extraTcs = historyKeysLc.filter((tc) => nsRegex.test(tc) && !slots.includes(tc));
 
     const perTc = executed.map(({ slot, variants }) => {
-        // Merge entries from every variant (base + .v2 etc.); pick best non-skip status.
+        // Merge entries from every variant (base + .v2 etc.), then determine current status:
+        //   - If the latest run has any non-skip entry for this slot → active (passed/failed/timedOut).
+        //   - If the latest run skipped every project but prior runs have non-skip history → inactive
+        //     (slot ran historically but is now dormant — usually a V1/V2 scope drift).
+        //   - If the slot has never had a non-skip run → skipped (truly blocked).
+        // `priorStatus`/`priorTimestamp` surface the last-known non-skip status when inactive, so
+        // dormant-but-once-failing slots don't inflate the Failed count yet retain their history.
         const allEntries = variants.flatMap((v) => historyLc.get(v) || []);
-        const nonSkip = allEntries.filter((e) => e.status !== 'skipped');
-        const recent = (nonSkip.length ? nonSkip : allEntries).sort(
-            (a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0)
-        );
-        const last = recent[0] || null;
+        const byRun = new Map();
+        for (const e of allEntries) {
+            const key = e.timestamp || '?';
+            if (!byRun.has(key)) byRun.set(key, []);
+            byRun.get(key).push(e);
+        }
+        const runsDesc = [...byRun.keys()].sort((a, b) => new Date(b) - new Date(a));
+        const latestRunEntries = runsDesc.length ? byRun.get(runsDesc[0]) : [];
+        const latestNonSkip = latestRunEntries.filter((e) => e.status !== 'skipped');
+
+        let lastStatus, lastTimestamp, lastFingerprint, lastProject, lastActualRaw;
+        let priorStatus = null;
+        let priorTimestamp = null;
+
+        if (latestNonSkip.length > 0) {
+            // Active — surface the attention-needed status if any project failed/timedOut.
+            const worst =
+                latestNonSkip.find((e) => e.status === 'failed' || e.status === 'timedOut') || latestNonSkip[0];
+            lastStatus = worst.status;
+            lastTimestamp = worst.timestamp;
+            lastFingerprint = worst.fingerprint;
+            lastProject = worst.project;
+            lastActualRaw = worst.actualRaw;
+        } else {
+            const priorNonSkip = allEntries
+                .filter((e) => e.status !== 'skipped')
+                .sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0));
+            const latest = latestRunEntries[0] || null;
+            if (priorNonSkip.length > 0) {
+                // Inactive: latest run skipped everything, but we have older non-skip history.
+                lastStatus = 'inactive';
+                lastTimestamp = latest?.timestamp || priorNonSkip[0].timestamp;
+                lastFingerprint = latest?.fingerprint || priorNonSkip[0].fingerprint;
+                lastProject = latest?.project || priorNonSkip[0].project;
+                lastActualRaw = priorNonSkip[0].actualRaw;
+                priorStatus = priorNonSkip[0].status;
+                priorTimestamp = priorNonSkip[0].timestamp;
+            } else {
+                // Never non-skipped.
+                lastStatus = 'skipped';
+                lastTimestamp = latest?.timestamp || null;
+                lastFingerprint = latest?.fingerprint || null;
+                lastProject = latest?.project || null;
+                lastActualRaw = null;
+            }
+        }
+
         const pStatus = { passed: 0, failed: 0, timedOut: 0, skipped: 0 };
         for (const e of allEntries) pStatus[e.status] = (pStatus[e.status] || 0) + 1;
         return {
             tcId: slot,
             variants,
             runs: allEntries.length,
-            lastStatus: last?.status || null,
-            lastTimestamp: last?.timestamp || null,
-            lastFingerprint: last?.fingerprint || null,
-            lastProject: last?.project || null,
-            lastActualRaw: last?.actualRaw || null,
+            lastStatus,
+            lastTimestamp,
+            lastFingerprint,
+            lastProject,
+            lastActualRaw,
+            priorStatus,
+            priorTimestamp,
             perStatus: pStatus,
         };
     });
@@ -350,7 +392,7 @@ for (const comp of componentsToRun) {
         umbrellaCovered: umbrellaCovered.length,
         pending: pending.length,
     };
-    const byLastStatus = { passed: 0, failed: 0, timedOut: 0, skipped: 0, unknown: 0 };
+    const byLastStatus = { passed: 0, failed: 0, timedOut: 0, inactive: 0, skipped: 0, unknown: 0 };
     for (const t of perTc) {
         const key = t.lastStatus && byLastStatus[t.lastStatus] !== undefined ? t.lastStatus : 'unknown';
         byLastStatus[key]++;
@@ -387,28 +429,32 @@ function renderComponent(comp, data) {
     lines.push(`| **Actionable pending** (need work) | **${counts.pending}** |`);
     lines.push(`| Extras (executed but not in matrix) | ${extraTcs.length} |`);
     lines.push('');
-    lines.push('### Executed — last-run status breakdown');
+    lines.push('### Executed — current-run status breakdown');
     lines.push('');
     lines.push('| Metric | Count |');
     lines.push('| --- | --- |');
-    lines.push(`| Passed | ${byLastStatus.passed} |`);
-    lines.push(`| Failed | ${byLastStatus.failed} |`);
-    lines.push(`| TimedOut | ${byLastStatus.timedOut} |`);
-    lines.push(`| Skipped only (no non-skip run) | ${byLastStatus.skipped} |`);
+    lines.push(`| Passed (latest run) | ${byLastStatus.passed} |`);
+    lines.push(`| Failed (latest run) | ${byLastStatus.failed} |`);
+    lines.push(`| TimedOut (latest run) | ${byLastStatus.timedOut} |`);
+    lines.push(
+        `| Inactive (latest run skipped across all projects; prior non-skip exists) | ${byLastStatus.inactive} |`
+    );
+    lines.push(`| Skipped only (never a non-skip run) | ${byLastStatus.skipped} |`);
     lines.push(`| Unknown | ${byLastStatus.unknown} |`);
     lines.push('');
 
     if (!PENDING_ONLY && perTc.length) {
         lines.push('## Executed — per-TC last status');
         lines.push('');
-        lines.push('| TC | Runs | Last status | Last run | Build | Project | Last actualRaw |');
-        lines.push('| -- | ---- | ----------- | -------- | ----- | ------- | -------------- |');
+        lines.push('| TC | Runs | Last status | Prior non-skip | Last run | Build | Project | Last actualRaw |');
+        lines.push('| -- | ---- | ----------- | -------------- | -------- | ----- | ------- | -------------- |');
         for (const t of perTc.sort((a, b) => a.tcId.localeCompare(b.tcId, undefined, { numeric: true }))) {
             const raw = String(t.lastActualRaw ?? '')
                 .slice(0, 40)
                 .replace(/\|/g, '\\|');
+            const prior = t.priorStatus ? `${t.priorStatus} (${fmtTs(t.priorTimestamp).slice(0, 10)})` : '—';
             lines.push(
-                `| ${t.tcId} | ${t.runs} | ${t.lastStatus || '?'} | ${fmtTs(t.lastTimestamp)} | ${t.lastFingerprint || '?'} | ${t.lastProject || '?'} | \`${raw}\` |`
+                `| ${t.tcId} | ${t.runs} | ${t.lastStatus || '?'} | ${prior} | ${fmtTs(t.lastTimestamp)} | ${t.lastFingerprint || '?'} | ${t.lastProject || '?'} | \`${raw}\` |`
             );
         }
         lines.push('');
@@ -487,9 +533,20 @@ if (componentsToRun.length > 1) {
             acc.passed += d.byLastStatus.passed;
             acc.failed += d.byLastStatus.failed;
             acc.timedOut += d.byLastStatus.timedOut;
+            acc.inactive += d.byLastStatus.inactive || 0;
             return acc;
         },
-        { slots: 0, executed: 0, umbrellaCovered: 0, nonExecutable: 0, pending: 0, passed: 0, failed: 0, timedOut: 0 }
+        {
+            slots: 0,
+            executed: 0,
+            umbrellaCovered: 0,
+            nonExecutable: 0,
+            pending: 0,
+            passed: 0,
+            failed: 0,
+            timedOut: 0,
+            inactive: 0,
+        }
     );
 
     const rollup = [];
@@ -502,17 +559,17 @@ if (componentsToRun.length > 1) {
     rollup.push('`Pending` = actionable (not umbrella/skip/theoretical and not covered by a fine-grained child).');
     rollup.push('');
     rollup.push(
-        '| Component | Slots | Executed | Umbrella | NonExec | Pending | Passed | Failed | TimedOut | Status |'
+        '| Component | Slots | Executed | Umbrella | NonExec | Pending | Passed | Failed | TimedOut | Inactive | Status |'
     );
-    rollup.push('| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |');
+    rollup.push('| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |');
     for (const comp of componentsToRun) {
         const d = allComponents[comp];
         rollup.push(
-            `| ${comp} | ${d.counts.total} | ${d.counts.executed} | ${d.counts.umbrellaCovered} | ${d.counts.nonExecutable} | **${d.counts.pending}** | ${d.byLastStatus.passed} | ${d.byLastStatus.failed} | ${d.byLastStatus.timedOut} | [\`${comp}/status.md\`](${comp}/status.md) |`
+            `| ${comp} | ${d.counts.total} | ${d.counts.executed} | ${d.counts.umbrellaCovered} | ${d.counts.nonExecutable} | **${d.counts.pending}** | ${d.byLastStatus.passed} | ${d.byLastStatus.failed} | ${d.byLastStatus.timedOut} | ${d.byLastStatus.inactive || 0} | [\`${comp}/status.md\`](${comp}/status.md) |`
         );
     }
     rollup.push(
-        `| **TOTAL** | **${total.slots}** | **${total.executed}** | **${total.umbrellaCovered}** | **${total.nonExecutable}** | **${total.pending}** | **${total.passed}** | **${total.failed}** | **${total.timedOut}** | |`
+        `| **TOTAL** | **${total.slots}** | **${total.executed}** | **${total.umbrellaCovered}** | **${total.nonExecutable}** | **${total.pending}** | **${total.passed}** | **${total.failed}** | **${total.timedOut}** | **${total.inactive}** | |`
     );
     rollup.push('');
     rollup.push('Regenerate with: `npm run task:status -- --project ' + PROJECT + ' --write`');

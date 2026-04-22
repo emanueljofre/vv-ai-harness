@@ -591,6 +591,8 @@ npm run task:status -- --project EmanuelJofre-vv5dev --json
 
 Parses TC IDs from `research/date-handling/{component}/matrix.md`, walks `projects/{project}/**/*.json` for regression results, diffs the two to classify each slot as: **executed** (at least one non-skipped run — with last status, run count, fingerprint, project, last actualRaw), **pending** (in matrix, never executed on this customer), or **extra** (executed but not in matrix — usually an ID-format mismatch or newly-added spec).
 
+Per-TC `lastStatus` reflects the **latest run's activity**, not the most recent non-skip. Values: `passed`/`failed`/`timedOut` (latest run had a non-skip entry), `inactive` (latest run skipped across all projects but prior runs had non-skip history — usually a V1/V2 scope drift), or `skipped` (never non-skipped). Inactive rows surface `priorStatus` + `priorTimestamp` so dormant-but-once-failing slots don't inflate the Failed count yet retain their history.
+
 Covers all six date-handling components (`forms-calendar`, `web-services`, `dashboards`, `document-library`, `workflows`, `scheduled-processes`). Omit `--component` to get a cross-component rollup + per-component breakdown; pass `--component <name>` to limit scope. Each component has its own matrix ID format (`1-A-BRT`, `ws-1-*`, `db-5-exact`, `doc-1-iso-date`, `wf-1-brt-midday`, `sp-2-now-brt`) — all normalized to lowercase for matching.
 
 **Requires the regression-reporter to know about the component's ID prefix** — `regression-reporter.js` extracts `TC-*:` (forms), `DB-*:`/`DOC-*:`/`WF-*:`/`SP-*:`/`WS-*:` category titles, and lowercase fine-grained slot IDs from test titles. Tests whose titles don't carry a recognizable slot ID are not tracked by this tool.
