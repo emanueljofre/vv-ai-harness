@@ -882,6 +882,12 @@ module.exports.main = async function (ffCollection, vvClient, response) {
                     error = err.message || String(err);
                 }
 
+                // Explicit discriminator for the WS-6 matrix comparator: after a
+                // write of "", null, omitted, etc. the "success" signal is "the
+                // field came back empty" — not a stored-string match. `cleared`
+                // is true when the post-write read-back yielded null/empty.
+                const cleared = accepted && (stored === null || stored === '' || stored === undefined);
+
                 const entry = buildResultEntry(configKey, {
                     // `variant` is the matrix slot-id discriminator (ws-6-a-<variant>).
                     variant: scenario.id,
@@ -890,6 +896,7 @@ module.exports.main = async function (ffCollection, vvClient, response) {
                     sent: scenario.id === 'clearUpd' ? `"${normalDate}" then ""` : scenario.value,
                     accepted,
                     stored,
+                    cleared,
                     recordID: recordID || null,
                     error: error || null,
                 });

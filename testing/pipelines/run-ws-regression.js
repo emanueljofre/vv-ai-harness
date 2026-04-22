@@ -246,7 +246,21 @@ async function main() {
                     // matrix land as status='unknown' (NOT_IN_MATRIX). This replaces
                     // the old uniform 'executed' marker so task-status can report
                     // real passed/failed counts without re-running the generator.
-                    const verdict = classifyRow({ tcId, stored }, matrixExpected);
+                    //
+                    // Per-action discriminators (see ws-matrix-compare.js):
+                    //   WS-6: `cleared` — post-write read-back was null/empty.
+                    //   WS-8: `matched` — the query returned any records.
+                    // Default actions fall back to `stored` string equality.
+                    const verdict = classifyRow(
+                        {
+                            tcId,
+                            action: inv.action,
+                            stored,
+                            cleared: r.cleared,
+                            matched: r.matched,
+                        },
+                        matrixExpected
+                    );
 
                     return {
                         tcId,
@@ -263,6 +277,14 @@ async function main() {
                         finalRead: r.finalRead,
                         drift: r.drift,
                         match: r.match,
+                        // WS-6 empty-handling discriminator: post-write read-back.
+                        cleared: r.cleared,
+                        // WS-8 query-filter discriminators: did the query match?
+                        matched: r.matched,
+                        matchCount: r.matchCount,
+                        expectedMatch: r.expectedMatch,
+                        queryType: r.queryType,
+                        scenario: r.scenario,
                         // Write-time pass/fail stamp (previously just 'executed').
                         status: verdict.status,
                         expectedStored: verdict.expectedStored,

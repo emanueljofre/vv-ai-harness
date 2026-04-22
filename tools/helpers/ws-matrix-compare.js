@@ -124,16 +124,59 @@ function parseMatrixExpected(matrixPath) {
 }
 
 /**
+ * Per-action comparators. Each takes `(row, expectedStored)` and returns a
+ * boolean pass verdict. The default (used by WS-1/2/3/5/7/9/10) is plain
+ * string equality of `stored` against the matrix Expected — same behavior as
+ * before the per-action dispatch was introduced.
+ *
+ * Extending: add a new entry here keyed by action name. Keep the default as
+ * the fallback so existing actions keep working.
+ *
+ * WS-6 (empty/null handling): success is semantic — "the field came back
+ * empty after the write". The matrix Expected is free-form (`"" or null`,
+ * `Cleared`), so we tolerate any phrasing containing `cleared`, `null`, or
+ * `empty` and compare against the harness `cleared` boolean.
+ *
+ * WS-8 (query filtering): success is semantic — "the query returned the
+ * expected number of matches". The matrix Expected is `Match` or `No match`.
+ * Harness emits a `matched` boolean; we compare against that.
+ */
+const ACTION_COMPARATORS = {
+    'WS-6': (row, expectedStored) => {
+        // Matrix Expected is one of: `"" or null`, `Cleared`, `"undefined"` (lit).
+        // Any phrasing implying "empty" → expect `cleared === true`.
+        const exp = String(expectedStored || '').toLowerCase();
+        const expectsCleared = /cleared|null|^""\s*or\s*null|empty/.test(exp) || exp === '""' || exp === '';
+        // `"undefined"` (literal-string) slots expect the field to NOT be
+        // stored as a literal string — the record comes back null, i.e.
+        // cleared. Treat it the same as the other "should be empty" variants.
+        const expectsUndefinedLiteral = /undefined/.test(exp);
+        const shouldBeCleared = expectsCleared || expectsUndefinedLiteral;
+        return shouldBeCleared ? row.cleared === true : false;
+    },
+    'WS-8': (row, expectedStored) => {
+        const exp = String(expectedStored || '').toLowerCase();
+        if (/^no\s*match/.test(exp)) return row.matched === false;
+        if (/^match/.test(exp)) return row.matched === true;
+        // Format-mismatch rows use `"undefined"` — the matrix flags them as
+        // "record the result, don't judge". Treat as unknown by returning
+        // null so the caller can downgrade to `unknown` rather than `failed`.
+        return null;
+    },
+};
+
+/**
  * Classify a regression-result row against the matrix.
  *
  * Returns `{ status, expectedStored, matrixStatus }`:
- *   - 'passed'  — actual stored matches matrix Expected exactly
- *   - 'failed'  — actual stored differs from matrix Expected
- *   - 'unknown' — row's tcId isn't in the matrix (NOT_IN_MATRIX)
+ *   - 'passed'  — row meets matrix Expected (per-action comparator)
+ *   - 'failed'  — row differs from matrix Expected
+ *   - 'unknown' — row's tcId isn't in the matrix (NOT_IN_MATRIX),
+ *                 or the action's comparator declined to judge (e.g. WS-8
+ *                 format-mismatch slots)
  *
- * The comparison mirrors `stripBackticks(String(row.stored ?? 'null'))` vs the
- * stripped matrix value — a straight equality check, same as the original
- * block in generate-ws-artifacts.js.
+ * Per-action dispatch on `row.action`. Falls back to the default `stored`
+ * string-equality for actions with no entry in ACTION_COMPARATORS.
  */
 function classifyRow(row, expectedMap) {
     const tcId = row.tcId || buildWsSlotId(row);
@@ -142,8 +185,25 @@ function classifyRow(row, expectedMap) {
     if (!expected) {
         return { status: 'unknown', expectedStored: null, matrixStatus: null };
     }
-    const actualStored = stripBackticks(String(row.stored ?? 'null'));
-    const passed = actualStored === expected.expectedStored;
+
+    const comparator = ACTION_COMPARATORS[row.action];
+    let passed;
+    if (comparator) {
+        passed = comparator(row, expected.expectedStored);
+        if (passed === null) {
+            return {
+                status: 'unknown',
+                expectedStored: expected.expectedStored,
+                matrixStatus: expected.status,
+            };
+        }
+    } else {
+        // Default: straight string equality of `stored` against matrix Expected.
+        // Matches the pre-dispatch behavior used by WS-1/2/3/5/7/9/10.
+        const actualStored = stripBackticks(String(row.stored ?? 'null'));
+        passed = actualStored === expected.expectedStored;
+    }
+
     return {
         status: passed ? 'passed' : 'failed',
         expectedStored: expected.expectedStored,
@@ -156,4 +216,5 @@ module.exports = {
     classifyRow,
     stripBackticks,
     parseBugs,
+    ACTION_COMPARATORS,
 };
