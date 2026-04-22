@@ -20,6 +20,7 @@
 const fs = require('fs');
 const path = require('path');
 const { buildWsSlotId } = require('../helpers/ws-slot-id');
+const { parseMatrixExpected, classifyRow } = require('../helpers/ws-matrix-compare');
 
 const REPO_ROOT = path.resolve(__dirname, '..', '..');
 const ARTIFACTS_DIR = path.join(REPO_ROOT, 'research', 'date-handling', 'web-services');
@@ -51,30 +52,48 @@ function main() {
     const data = JSON.parse(fs.readFileSync(inputPath, 'utf8'));
     const today = new Date().toISOString().substring(0, 10);
 
-    // Parse matrix for expected values (source of truth)
-    const matrixExpected = parseMatrix(MATRIX_PATH);
+    // Parse matrix for expected values (source of truth). Needed both to attach
+    // `_expectedStored` for the run-file tables and as a fallback classifier
+    // when the row wasn't stamped by the pipeline (old JSONs).
+    const matrixExpected = parseMatrixExpected(MATRIX_PATH);
     console.log(`Matrix loaded: ${matrixExpected.size} test IDs with expected values`);
 
-    // Filter to actual results (not errors)
+    // Accept both new (stamped) and old pipeline JSONs:
+    //   - new: status is 'passed' | 'failed' | 'unknown' | 'error'
+    //   - old: status is 'executed' | 'error' (PASS/FAIL computed here)
     const executed = data.results.filter(
-        (r) => r.status === 'executed' || r.status === 'passed' || r.status === 'failed'
+        (r) => r.status === 'executed' || r.status === 'passed' || r.status === 'failed' || r.status === 'unknown'
     );
     console.log(`Processing ${executed.length} WS results (${data.summary.errors || 0} errors excluded)`);
 
-    // Determine PASS/FAIL for each result using matrix Expected
+    // Determine PASS/FAIL for each row. Prefer the pipeline-stamped status when
+    // present; otherwise classify against the matrix ourselves (belt-and-suspenders
+    // for old JSONs that predate write-time stamping).
     for (const r of executed) {
-        const tcId = buildTcId(r);
-        const expected = matrixExpected.get(tcId);
-        if (expected) {
-            const actualStored = stripBackticks(String(r.stored ?? 'null'));
-            r._expectedStored = expected.expectedValue;
-            r._status = actualStored === expected.expectedValue ? 'PASS' : 'FAIL';
-            r._matrixStatus = expected.status; // What the matrix says
-        } else {
-            // Not in matrix — use harness match as fallback
+        if (r.status === 'passed' || r.status === 'failed') {
+            // Pipeline already classified. Reuse expectedStored if the row carries
+            // it; otherwise look it up for the run-file table.
+            r._status = r.status === 'passed' ? 'PASS' : 'FAIL';
+            if (r.expectedStored !== undefined && r.expectedStored !== null) {
+                r._expectedStored = r.expectedStored;
+            } else {
+                const entry = matrixExpected.get(String(r.tcId || buildWsSlotId(r) || '').toLowerCase());
+                r._expectedStored = entry ? entry.expectedStored : null;
+            }
+            r._matrixStatus = r.matrixStatus || null;
+            continue;
+        }
+        // 'executed' (old JSON) or 'unknown' (new JSON, NOT_IN_MATRIX) — classify.
+        const verdict = classifyRow(r, matrixExpected);
+        if (verdict.status === 'unknown') {
+            // Not in matrix — use harness match as fallback, same as the old code.
             r._expectedStored = null;
             r._status = r.match ? 'PASS' : 'FAIL';
             r._matrixStatus = null;
+        } else {
+            r._expectedStored = verdict.expectedStored;
+            r._status = verdict.status === 'passed' ? 'PASS' : 'FAIL';
+            r._matrixStatus = verdict.matrixStatus;
         }
     }
 
@@ -154,84 +173,10 @@ function main() {
     if (dryRun) console.log('(dry-run — no files written)');
 }
 
-/**
- * Parse matrix.md and build a Map<testId, { expectedValue, status }>.
- *
- * Strategy: for each markdown table, find the header row, locate the column
- * containing "Expected" (case-insensitive), then extract that column's value
- * for every data row. The test ID is always column 1.
- */
-function parseMatrix(matrixPath) {
-    const content = fs.readFileSync(matrixPath, 'utf8');
-    const lines = content.split('\n');
-    const result = new Map();
-
-    let expectedColIdx = -1;
-    let statusColIdx = -1;
-    let inTable = false;
-
-    for (const line of lines) {
-        // Detect table header rows
-        if (line.startsWith('|') && !inTable) {
-            const cols = line.split('|').map((c) => c.trim());
-            const headerIdx = cols.findIndex((c) => /expected/i.test(c));
-            if (headerIdx >= 0) {
-                expectedColIdx = headerIdx;
-                statusColIdx = cols.findIndex((c) => /^status$/i.test(c));
-                inTable = true;
-                continue;
-            }
-        }
-
-        // Skip separator rows
-        if (inTable && line.startsWith('|') && line.includes('---')) continue;
-
-        // Parse data rows
-        if (inTable && line.startsWith('|')) {
-            const cols = line.split('|').map((c) => c.trim());
-            const testId = cols[1];
-            if (!testId || testId === '' || /^-+$/.test(testId) || /ID/i.test(testId)) continue;
-
-            const expectedRaw = expectedColIdx >= 0 ? cols[expectedColIdx] : null;
-            const statusRaw = statusColIdx >= 0 ? cols[statusColIdx] : null;
-
-            if (expectedRaw && testId) {
-                result.set(testId, {
-                    expectedValue: stripBackticks(expectedRaw),
-                    status: statusRaw?.trim() || 'PENDING',
-                });
-            }
-        }
-
-        // End of table (blank line or heading)
-        if (inTable && !line.startsWith('|') && line.trim() !== '') {
-            if (line.startsWith('>') || line.startsWith('#')) {
-                inTable = false;
-                expectedColIdx = -1;
-                statusColIdx = -1;
-            }
-        }
-    }
-
-    return result;
-}
-
-/**
- * Strip markdown backtick wrapping: `"value"` → "value" → value
- */
-function stripBackticks(s) {
-    if (!s) return s;
-    let clean = s.replace(/^`+|`+$/g, '').trim();
-    // Remove wrapping quotes: "value" → value
-    if (clean.startsWith('"') && clean.endsWith('"')) {
-        clean = clean.slice(1, -1);
-    }
-    return clean;
-}
-
 // Slot ID: prefer the write-time-stamped r.tcId, fall back to composing from the
 // row fields (handles old regression JSONs and the testing/tmp path that predates
-// the pipeline stamp).
+// the pipeline stamp). Matrix parsing + pass/fail classification live in
+// tools/helpers/ws-matrix-compare.js (shared with run-ws-regression.js).
 function buildTcId(result) {
     return result.tcId || buildWsSlotId(result);
 }

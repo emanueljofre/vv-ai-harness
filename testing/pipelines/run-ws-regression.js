@@ -21,12 +21,14 @@ const path = require('path');
 const { captureBuildContext } = require('../../tools/helpers/build-context');
 const { fingerprint } = require('../../tools/helpers/build-fingerprint');
 const { buildWsSlotId } = require('../../tools/helpers/ws-slot-id');
+const { parseMatrixExpected, classifyRow } = require('../../tools/helpers/ws-matrix-compare');
 const { WS_TEMPLATE_NAME } = require('../fixtures/ws-config');
 const { vvConfig } = require('../fixtures/vv-config');
 
 const REPO_ROOT = path.resolve(__dirname, '..', '..');
 const RUNNER_PATH = path.join(REPO_ROOT, 'tools', 'runners', 'run-ws-test.js');
 const GENERATOR_PATH = path.join(REPO_ROOT, 'tools', 'generators', 'generate-ws-artifacts.js');
+const MATRIX_PATH = path.join(REPO_ROOT, 'research', 'date-handling', 'web-services', 'matrix.md');
 
 // Route raw results to the active customer's project folder (personal/env-bound data).
 // Falls back to testing/tmp/ if no projects/{customer}/ folder exists.
@@ -159,6 +161,12 @@ async function main() {
 
         console.log(`\n=== Phase 1: Running ${invocations.length} WS test invocations ===\n`);
 
+        // Load matrix once up-front so each captured row can be classified into
+        // passed/failed at write time (see ws-matrix-compare.js). Rows whose tcId
+        // isn't in the matrix fall back to 'unknown'.
+        const matrixExpected = parseMatrixExpected(MATRIX_PATH);
+        console.log(`Matrix loaded: ${matrixExpected.size} expected values for pass/fail stamping\n`);
+
         const allResults = [];
         // Track record IDs created by WS-1 for use by WS-2 (dynamic, no hardcoded IDs)
         const createdRecords = {}; // { BRT: 'DateTest-NNNNNN', IST: '...', UTC: '...' }
@@ -215,47 +223,58 @@ async function main() {
                 }
                 const jsonStr = output.substring(firstBrace).trim();
                 const result = JSON.parse(jsonStr);
-                const entries = (result.data?.results || []).map((r) => ({
+                const entries = (result.data?.results || []).map((r) => {
                     // Slot ID composed at write-time so downstream tools (task-status,
                     // audit-ws-v2, generate-ws-artifacts) read `r.tcId` uniformly.
-                    tcId: buildWsSlotId({
+                    const tcId = buildWsSlotId({
                         action: inv.action,
                         tz: inv.tz,
                         config: r.config,
                         format: r.format,
                         variant: r.variant || r.pattern,
-                    }),
-                    action: inv.action,
-                    tz: inv.tz,
-                    config: r.config,
-                    fieldName: r.fieldName,
-                    sent: r.sent,
+                    });
                     // Normalize each action's "observed final value" into `stored`
                     // so downstream tooling has one field to compare against V1:
                     //   WS-1/5/7: `stored`    (read-back after write)
                     //   WS-2:     `apiReturn` (read-only)
                     //   WS-3:     `finalRead` → `cycle2Read` → `cycle1Read`
                     //   WS-6:     `stored`    (post-empty-write read-back)
-                    stored: r.stored ?? r.apiReturn ?? r.finalRead ?? r.cycle2Read ?? r.cycle1Read,
-                    returned: r.returned ?? r.apiReturn,
-                    // Preserve WS-3 cycle details for round-trip drift analysis
-                    cycle1Read: r.cycle1Read,
-                    cycle2Read: r.cycle2Read,
-                    finalRead: r.finalRead,
-                    drift: r.drift,
-                    // Harness match is strict (sent vs stored); for regression we
-                    // record the actual stored value — status is determined by the
-                    // artifact generator comparing against matrix Expected values.
-                    // For now, mark as 'executed' and let stored be the actual.
-                    match: r.match,
-                    status: 'executed',
-                    serverTime: result.data?.serverTime,
-                    serverTimezone: result.data?.serverTimezone,
-                    // WS-5/9 may have extra fields
-                    format: r.format,
-                    variant: r.variant || r.pattern,
-                    error: r.error,
-                }));
+                    const stored = r.stored ?? r.apiReturn ?? r.finalRead ?? r.cycle2Read ?? r.cycle1Read;
+
+                    // Stamp pass/fail at write time by comparing the observed stored
+                    // value against matrix Expected. Rows whose tcId isn't in the
+                    // matrix land as status='unknown' (NOT_IN_MATRIX). This replaces
+                    // the old uniform 'executed' marker so task-status can report
+                    // real passed/failed counts without re-running the generator.
+                    const verdict = classifyRow({ tcId, stored }, matrixExpected);
+
+                    return {
+                        tcId,
+                        action: inv.action,
+                        tz: inv.tz,
+                        config: r.config,
+                        fieldName: r.fieldName,
+                        sent: r.sent,
+                        stored,
+                        returned: r.returned ?? r.apiReturn,
+                        // Preserve WS-3 cycle details for round-trip drift analysis
+                        cycle1Read: r.cycle1Read,
+                        cycle2Read: r.cycle2Read,
+                        finalRead: r.finalRead,
+                        drift: r.drift,
+                        match: r.match,
+                        // Write-time pass/fail stamp (previously just 'executed').
+                        status: verdict.status,
+                        expectedStored: verdict.expectedStored,
+                        matrixStatus: verdict.matrixStatus,
+                        serverTime: result.data?.serverTime,
+                        serverTimezone: result.data?.serverTimezone,
+                        // WS-5/9 may have extra fields
+                        format: r.format,
+                        variant: r.variant || r.pattern,
+                        error: r.error,
+                    };
+                });
 
                 allResults.push(...entries);
 
@@ -282,13 +301,19 @@ async function main() {
         const buildContext = await captureBuildContext().catch(() => null);
         if (buildContext) buildContext.fingerprint = fingerprint(buildContext);
 
-        // Save results
+        // Save results. `executed` now counts rows with a matrix-classified or
+        // unknown status (anything that isn't a runner error) — matching the
+        // filter downstream artifact generators apply.
+        const isExecuted = (r) => r.status === 'passed' || r.status === 'failed' || r.status === 'unknown';
         const output = {
             timestamp: new Date().toISOString(),
             buildContext,
             summary: {
                 total: allResults.length,
-                executed: allResults.filter((r) => r.status === 'executed').length,
+                executed: allResults.filter(isExecuted).length,
+                passed: allResults.filter((r) => r.status === 'passed').length,
+                failed: allResults.filter((r) => r.status === 'failed').length,
+                unknown: allResults.filter((r) => r.status === 'unknown').length,
                 errors: allResults.filter((r) => r.status === 'error').length,
             },
             results: allResults,
@@ -297,7 +322,7 @@ async function main() {
         fs.writeFileSync(RESULTS_PATH, JSON.stringify(output, null, 2));
         console.log(`Results saved: ${RESULTS_PATH}`);
         console.log(
-            `Summary: ${output.summary.total} total — ${output.summary.executed} executed / ${output.summary.errors} errors`
+            `Summary: ${output.summary.total} total — ${output.summary.passed} passed / ${output.summary.failed} failed / ${output.summary.unknown} unknown / ${output.summary.errors} errors`
         );
     }
 
