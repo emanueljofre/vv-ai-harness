@@ -193,6 +193,7 @@ coverage/
 # Claude Code ephemeral artifacts
 .claude/plans/
 .claude/worktrees/
+.claude/scheduled_tasks.lock
 
 # ─── Harness architecture ─────────────────────────────────
 # Independent repos nested inside the harness (each has its own .git)
