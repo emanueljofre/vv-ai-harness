@@ -334,10 +334,10 @@ Test `postFormRevision()` behavior: changing dates, preserving existing values, 
 
 | ID              | Config | Scenario | Step 1 (Create)         | Step 2 (Update)         | Expected After Update    | Status | Actual                   | Notes                    |
 | --------------- | :----: | :------: | ----------------------- | ----------------------- | ------------------------ | :----: | ------------------------ | ------------------------ |
-| ws-7-A-change   |   A    |  Change  | `"2026-03-15"`          | `"2026-06-20"`          | `"2026-06-20"`           |  PASS  | `"2026-06-20T00:00:00Z"` | New date replaces old ✓  |
-| ws-7-C-change   |   C    |  Change  | `"2026-03-15T14:30:00"` | `"2026-06-20T09:00:00"` | `"2026-06-20T09:00:00"`  |  PASS  | `"2026-06-20T09:00:00Z"` | DateTime change ✓        |
-| ws-7-D-change   |   D    |  Change  | `"2026-03-15T14:30:00"` | `"2026-06-20T09:00:00"` | `"2026-06-20T09:00:00"`  |  PASS  | `"2026-06-20T09:00:00Z"` | DateTime+ignoreTZ ✓      |
-| ws-7-H-change   |   H    |  Change  | `"2026-03-15T14:30:00"` | `"2026-06-20T09:00:00"` | `"2026-06-20T09:00:00"`  |  PASS  | `"2026-06-20T09:00:00Z"` | Legacy ✓                 |
+| ws-7-A-change   |   A    |  Change  | `"2026-03-15"`          | `"2026-06-20"`          | `"2026-06-20T00:00:00Z"` |  PASS  | `"2026-06-20T00:00:00Z"` | New date replaces old ✓  |
+| ws-7-C-change   |   C    |  Change  | `"2026-03-15T14:30:00"` | `"2026-06-20T09:00:00"` | `"2026-06-20T09:00:00Z"` |  PASS  | `"2026-06-20T09:00:00Z"` | DateTime change ✓        |
+| ws-7-D-change   |   D    |  Change  | `"2026-03-15T14:30:00"` | `"2026-06-20T09:00:00"` | `"2026-06-20T09:00:00Z"` |  PASS  | `"2026-06-20T09:00:00Z"` | DateTime+ignoreTZ ✓      |
+| ws-7-H-change   |   H    |  Change  | `"2026-03-15T14:30:00"` | `"2026-06-20T09:00:00"` | `"2026-06-20T09:00:00Z"` |  PASS  | `"2026-06-20T09:00:00Z"` | Legacy ✓                 |
 | ws-7-A-preserve |   A    | Preserve | `"2026-03-15"`          | (field omitted)         | `"2026-03-15T00:00:00Z"` |  PASS  | `"2026-03-15T00:00:00Z"` | Field preserved ✓; H-9 ✓ |
 | ws-7-C-preserve |   C    | Preserve | `"2026-03-15T14:30:00"` | (field omitted)         | `"2026-03-15T14:30:00Z"` |  PASS  | `"2026-03-15T14:30:00Z"` | Preserved ✓              |
 | ws-7-D-preserve |   D    | Preserve | `"2026-03-15T14:30:00"` | (field omitted)         | `"2026-03-15T14:30:00Z"` |  PASS  | `"2026-03-15T14:30:00Z"` | Preserved ✓              |
