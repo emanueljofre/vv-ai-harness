@@ -294,14 +294,14 @@ How a global index field's `defaultValue` (configured in Admin → Index Field A
 - Slots needing a **fresh document**: upload a new `zzz-doc11-<timestamp>.txt` into the test folder, then GET/PUT against it.
 - Slots reusing the existing test document: PUT then GET against `testDocumentId`.
 
-| ID                              | Scenario                                                            | Expected                                   | Needs fresh doc | Tests                                                                |
-| ------------------------------- | ------------------------------------------------------------------- | ------------------------------------------ | :-------------: | -------------------------------------------------------------------- |
-| `doc-11-default-auto-populate`  | Upload fresh doc; GET index fields without any write                | `Date With Preset` = `2026-01-01T00:00:00` |       yes       | Does the default apply at doc creation?                              |
-| `doc-11-default-literal-copy`   | Upload fresh doc; compare returned value byte-for-byte vs field def | Identical string                           |       yes       | Server copies verbatim vs re-interprets in server TZ                 |
-| `doc-11-default-overwrite`      | Upload fresh doc (default applied); PUT `2026-06-15T10:00:00`; GET  | `2026-06-15T10:00:00`                      |       yes       | Default is overwritable                                              |
-| `doc-11-default-clear-fallback` | Upload fresh doc; PUT `""`; GET                                     | Default persists (or DOC-BUG-2 behavior)   |       yes       | Does clear revert to default, or inherit DOC-BUG-2 (previous value)? |
-| `doc-11-default-roundtrip`      | Existing doc: PUT `2026-01-01T00:00:00` (matches default), GET      | `2026-01-01T00:00:00`                      |       no        | Confirm no special treatment when explicit value equals default      |
-| `doc-11-default-z-strip`        | Inspect field definition's `defaultValue` via GET `/indexfields`    | `2026-01-01T00:00:00` (no Z)               |       no        | Confirm DOC-BUG-1 extends to field-definition defaults               |
+| ID                            | Scenario                                                            | Expected                                   | Needs fresh doc | Tests                                                                |
+| ----------------------------- | ------------------------------------------------------------------- | ------------------------------------------ | :-------------: | -------------------------------------------------------------------- |
+| doc-11-default-auto-populate  | Upload fresh doc; GET index fields without any write                | `Date With Preset` = `2026-01-01T00:00:00` |       yes       | Does the default apply at doc creation?                              |
+| doc-11-default-literal-copy   | Upload fresh doc; compare returned value byte-for-byte vs field def | Identical string                           |       yes       | Server copies verbatim vs re-interprets in server TZ                 |
+| doc-11-default-overwrite      | Upload fresh doc (default applied); PUT `2026-06-15T10:00:00`; GET  | `2026-06-15T10:00:00`                      |       yes       | Default is overwritable                                              |
+| doc-11-default-clear-fallback | Upload fresh doc; PUT `""`; GET                                     | Default persists (or DOC-BUG-2 behavior)   |       yes       | Does clear revert to default, or inherit DOC-BUG-2 (previous value)? |
+| doc-11-default-roundtrip      | Existing doc: PUT `2026-01-01T00:00:00` (matches default), GET      | `2026-01-01T00:00:00`                      |       no        | Confirm no special treatment when explicit value equals default      |
+| doc-11-default-z-strip        | Inspect field definition's `defaultValue` via GET `/indexfields`    | `2026-01-01T00:00:00` (no Z)               |       no        | Confirm DOC-BUG-1 extends to field-definition defaults               |
 
 > **Bug-tag candidate**: if `doc-11-default-clear-fallback` reverts to the default instead of keeping the last-written value, that's a **behavior divergence** from DOC-BUG-2 — index fields with defaults behave differently than index fields without. Worth documenting either way.
 
