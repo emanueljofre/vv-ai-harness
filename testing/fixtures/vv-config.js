@@ -94,16 +94,22 @@ const customerTemplates =
 // Per-customer document library test assets.
 // Keyed by .env.json customer key (EmanuelJofre-vvdemo, EmanuelJofre-vv5dev, WADNR).
 // Each customer needs a test folder with a Date index field and at least one test
-// document, AND its environment must have docapi enabled. If `null`, doc tests skip.
+// document. If `null`, doc tests skip.
+// Provision via: node tools/admin/setup-doc-test-assets.js --project <name>
 const CUSTOMER_DOC_CONFIG = {
     'EmanuelJofre-vvdemo': {
         testDocumentId: '5c4c9e8c-25ca-eb11-8202-d7701a6d4070', // Test1003 in /TestFolder
         dateFieldLabel: 'Date', // Date index field (fieldType 4) assigned to /TestFolder
         testFolderPath: '/TestFolder',
     },
-    // vv5dev has `docapi.enabled=false` in environment.json; doc tests skip until a
-    // compatible environment is available (needs: docapi enabled + test document + date index field).
-    'EmanuelJofre-vv5dev': null,
+    'EmanuelJofre-vv5dev': {
+        testDocumentId: '3b0b0f37-e83f-f111-8313-9bb7e317217d', // zzz-date-test-doc documentId (not revisionId)
+        testDocumentRevisionId: '72a66b3e-f36b-1410-85ef-001e45e95bc5',
+        testFolderId: '70a66b3e-f36b-1410-85ef-001e45e95bc5',
+        dateFieldLabel: 'Date',
+        presetDateFieldLabel: 'Date With Preset', // default value: "2026-01-01T00:00:00"
+        testFolderPath: '/zzz-date-tests',
+    },
     // WADNR: TBD — create zzz-prefixed test folder + document, add to writePolicy.documents[]
     WADNR: null,
 };
