@@ -33,6 +33,32 @@ Created by `testing/global-setup.js` and cached in `testing/config/saved-records
 
 Record keys: `cat3-A-BRT`, `cat3-AD-IST`, `cat3-C-BRT`, `cat3-B-BRT`, `cat3-G-BRT`, `cat3-EF-BRT`, `cat3-H-BRT`, `cat3-B-IST` (see `vv-config.js` `RECORD_DEFINITIONS`).
 
+## Custom Queries
+
+Required for WS-14 (Custom Query read path). Created manually in Central Admin → Custom Queries. Both `Text Query`, cache **disabled**, connection `use1d-vvdevsql1_vv5dev_EmanuelJofre_Main_FormData`.
+
+| Name | SQL | Used by |
+|------|-----|---------|
+| `DateTest - All Records` | `SELECT TOP 2000 * FROM [Date Test Harness] ORDER BY vvCreateDate DESC` | WS-14 filter variant (ODATA `q` applied on top) |
+| `DateTest - By Instance Name` | `SELECT TOP 100 * FROM [Date Test Harness] WHERE DhDocID = @instanceName` | WS-14 param variant (SQL `@instanceName` binding) |
+
+> **`ORDER BY vvCreateDate DESC` is load-bearing on vv5dev**: the form table exceeds 2000 rows. VV's `q` filter runs on the post-TOP SQL result set, so without descending order fresh rows fall outside the window and the filter can't find them. See `research/date-handling/web-services/matrix.md § WS-14` for the two platform mechanics uncovered during scaffolding (camelCased response columns + TOP/ORDER BY interaction).
+
+Query names are hardcoded in `scripts/examples/webservice-test-harness.js` `actionCustomQueryRead()`. Change them there if you rename the queries in Control Panel.
+
+## Document Library
+
+Provisioning: `node tools/admin/setup-doc-test-assets.js --project emanueljofre-vv5dev` (idempotent — safe to rerun).
+
+| Asset            | Value                                                                 |
+| ---------------- | --------------------------------------------------------------------- |
+| Test folder      | `/zzz-date-tests` (id `70a66b3e-f36b-1410-85ef-001e45e95bc5`)         |
+| Test document    | `zzz-date-test-doc` (documentId `3b0b0f37-e83f-f111-8313-9bb7e317217d`, revisionId `72a66b3e-f36b-1410-85ef-001e45e95bc5`) |
+| Index field 1    | `Date` (fieldType 4, no default) — assigned to folder                  |
+| Index field 2    | `Date With Preset` (fieldType 4, defaultValue `2026-01-01T00:00:00`) — assigned to folder |
+
+CUSTOMER_DOC_CONFIG wired in `testing/fixtures/vv-config.js`. Fresh-doc uploads for DOC-11 land in the same folder with `zzz-doc11-<timestamp>` naming.
+
 ## Notes
 
 - **Playwright integration**: `testing/fixtures/vv-config.js` selects the per-customer form URL + FIELD_MAP via `vvConfig.customerKey`. The customer key is `EmanuelJofre-vv5dev` (set as `.env.json` `activeCustomer`).

@@ -31,9 +31,22 @@ Read-write: **Yes** — primary development/testing environment.
 
 | Name | Script ID | Purpose | Parameters/Actions |
 |------|-----------|---------|-------------------|
-| DateTestWSHarness | `da6277cd-b32e-f111-ba23-0afff212cc87` | Multi-purpose WS date testing | Action (WS-1 through WS-7), TargetConfigs (A-H), RecordID, InputDate, InputFormats |
+| DateTestWSHarness | `da6277cd-b32e-f111-ba23-0afff212cc87` | Multi-purpose WS date testing | Action (WS-1 through WS-10, WS-14), TargetConfigs (A-H), RecordID, InputDate, InputFormats |
 
 Run via: `node tools/runners/run-ws-test.js --action WS-2`
+
+## Custom Queries
+
+Required for WS-14 (Custom Query read path) — **not yet created on vvdemo**. WS-14 baseline landed on vv5dev 2026-04-24; vvdemo replication would need these created in Central Admin → Administration → Custom Queries. Both `Text Query`, cache **disabled**, connection `FormData` (match existing `DateTest Form` query's connection).
+
+| Name | SQL | Used by |
+|------|-----|---------|
+| `DateTest - All Records` | `SELECT TOP 2000 * FROM [DateTest] ORDER BY vvCreateDate DESC` | WS-14 filter variant (ODATA `q` applied on top) |
+| `DateTest - By Instance Name` | `SELECT TOP 100 * FROM [DateTest] WHERE DhDocID = @instanceName` | WS-14 param variant (SQL `@instanceName` binding) |
+
+> **`ORDER BY vvCreateDate DESC` is load-bearing**: VV's `q` filter runs on the post-TOP SQL result set. If the form table exceeds the TOP limit, freshly-created records fall outside the window and `q` can't find them. Vv5dev hit this at ~7500 rows. See `research/date-handling/web-services/matrix.md § WS-14` for the two platform mechanics uncovered during scaffolding.
+
+Query names are hardcoded in `scripts/examples/webservice-test-harness.js` `actionCustomQueryRead()`. Change them there if you use different names in Control Panel.
 
 ## Saved Records
 
