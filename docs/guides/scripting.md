@@ -80,6 +80,135 @@ When disabled, skipping `postCompletion()` has no operational impact — recurre
 
 **`getCredentials()` is required** for scheduled scripts — the server calls it to authenticate with the VV API before invoking `main()`. Form scripts don't need it (the server uses the calling user's session).
 
+### postCompletion API quirks
+
+Lib signature (`lib/VVRestApi/VVRestApiNodeJs/VVRestApi.js:1519`):
+
+```javascript
+vvClient.scheduledProcess.postCompletion(id, action, result, message);
+```
+
+| Param     | Type              | Notes                                                                                                           |
+| --------- | ----------------- | --------------------------------------------------------------------------------------------------------------- |
+| `id`      | string            | Scheduled process GUID. Appended to URL: `…/scheduledProcess/{id}`                                              |
+| `action`  | string            | Sent as `?action=…` query param. Always included.                                                               |
+| `result`  | boolean \| string | Sent as `?result=…` only when non-null AND (`typeof === 'boolean'` OR `length > 0`). Coerced via `.toString()`. |
+| `message` | string            | Sent as `?message=…` only when truthy AND `length > 0`.                                                         |
+
+**All payload travels as query-string, not body.** Long messages risk URL length limits.
+
+**`action` valid values.** The [official VV docs](https://docs.visualvault.com/docs/scheduledprocess-1) document only `'Complete'` (capitalized) as a valid action value. The endpoint is case-insensitive in practice — lowercase `'complete'` works and is what the codebase has historically passed. New code in canonical templates should use `'Complete'` to match the docs.
+
+**`result` arg crashes on `undefined`.** The lib's filter `result !== null && (typeof result == 'boolean' || result.length > 0)` calls `.length` on the value when it's not a boolean. `undefined.length` throws TypeError. To omit the param, pass `null` explicitly — never `undefined`. Falsy values behave as:
+
+- `null` → omitted ✓
+- `undefined` → **TypeError** ✗
+- `false` → included as `"false"` ✓
+- `0` → omitted (no `.length` property)
+- `""` → omitted (length 0)
+
+### `vvClient.getBaseUrl()` accessor
+
+Public method (`VVRestApi.js:253`) returning the authenticated environment's base URL. Useful for environment detection in scripts:
+
+```javascript
+const baseUrl = vvClient.getBaseUrl();
+const environment = baseUrl ? new URL(baseUrl).hostname.split('.')[0] : 'unknown';
+```
+
+There are **no public accessors for `customerAlias` or `databaseAlias`** — those still require reading the private `vvClient._httpHelper._sessionToken`. Guard with optional chaining and nullish fallback:
+
+```javascript
+const sessionToken = vvClient._httpHelper?._sessionToken ?? {};
+const customerAlias = sessionToken.customerAlias ?? 'unknown';
+const databaseAlias = sessionToken.databaseAlias ?? 'unknown';
+```
+
+---
+
+## Workflow Microservice Scripts (`/scripts` from Process Studio)
+
+Triggered by a Microservice step in a VV V5 Process Studio workflow. The platform POSTs to the same `/scripts` endpoint as form scripts but adds a `vv-execution-id` HTTP header that identifies which workflow item is being processed.
+
+```javascript
+module.exports.main = async function (ffCollection, vvClient, response) {
+    // ffCollection: contains the workflow microservice's configured field values
+    // vvClient: authenticated VV REST API client
+    // response: Express response object — used for the immediate platform ack only
+
+    const executionId = response.req.headers['vv-execution-id'];
+
+    // 1. Immediate platform acknowledgment (closes the HTTP connection)
+    response.json(200, { success: true, message: `${serviceName} Started` });
+
+    try {
+        // ... business logic ...
+    } finally {
+        // 2. Signal completion to the workflow engine with the actual outcome
+        await vvClient.scripts.completeWorkflowWebService(executionId, {
+            MicroserviceResult: true,
+            MicroserviceMessage: 'Completed successfully',
+            // ...additional workflow variables...
+        });
+    }
+};
+```
+
+### Two-phase response
+
+Same fire-and-forget pattern as scheduled scripts: the route handler does not await `main()`, so the script owns the `res` object. `response.json()` closes the HTTP connection (sends the ack to the workflow engine), then the script keeps running and calls `completeWorkflowWebService()` separately to report the actual result.
+
+### completeWorkflowWebService API
+
+Lib signature (`lib/VVRestApi/VVRestApiNodeJs/VVRestApi.js:1740`):
+
+```javascript
+vvClient.scripts.completeWorkflowWebService(executionId, workflowVariables);
+```
+
+POSTs `{ executionId, workflowVariables }` as JSON body to VV's workflow completion endpoint. **All fields on `workflowVariables` are sent**, but the workflow engine only consumes fields explicitly mapped to workflow variables in Process Studio.
+
+**Public docs (`docs.visualvault.com/docs/scripts-1`) declare `workflowVariables: String`**, but the lib client (`VVRestApi.js:1747`) passes the value directly as a JavaScript object — the body is serialized as a JSON object end-to-end, not as a stringified-JSON string. The docs are imprecise. Pass an object; do not `JSON.stringify` it before calling.
+
+### Workflow variable contract
+
+| Field                          | Convention       | Notes                                                                                                                                                   |
+| ------------------------------ | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `MicroserviceResult`           | `true` / `false` | Conventional name. Drives workflow branching (success path vs error path).                                                                              |
+| `MicroserviceMessage`          | string           | Conventional name. Surfaces in workflow audit/history UI. Carry the human-readable summary or joined error reasons here.                                |
+| Custom fields                  | any              | Require explicit variable definition in Process Studio with matching name and type. Without that, the field is silently dropped by the workflow engine. |
+| Array fields (e.g. `errors[]`) | array            | Require explicit mapping. Workflow expressions don't bind well to arrays — prefer joining errors into `MicroserviceMessage` for accessible visibility.  |
+
+**System-typed variables (do not overwrite from your returnObject):**
+
+When a workflow variable is bound by the WF engine to a typed reference, sending a plain string for that variable in `workflowVariables` causes a **server-side `NullReferenceException`** (`Object reference not set to an instance of an object`) — the dispatch fails before the HTTP call ever leaves the platform, the Microservice step is marked errored, and the local Node.js script never runs.
+
+| Variable                                                              | Engine-populated value                                                                                                                                                                | What happens if you overwrite with a string                                 |
+| --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| `Originator`                                                          | User **GUID** (e.g. `5a84683e-f36b-1410-85ef-001e45e95bc5`)                                                                                                                           | Platform tries to resolve it as a User reference, fails, NPEs.              |
+| `SourceDocId` (when populated by an event source on a Form Data type) | The form record's **instance name string** (e.g. `Date Tes-007581`), not a GUID. **Do not pass this to `getFormInstanceById(templateId, sourceDocId)`** — that helper expects a Guid. | Echoing the value back is harmless; rewriting to a different shape can NPE. |
+
+Rule of thumb: for any variable already populated by the WF engine, omit it from your returnObject unless you have a specific reason to update it. Only include keys for variables the script is meant to set.
+
+### Failure modes
+
+- **Missing `vv-execution-id` header** (script invoked outside workflow context — manual test, misconfig): `executionId` is `undefined` and `completeWorkflowWebService` will fail. Always wrap the completion call in try/catch and log the failure — otherwise the workflow item is stuck (platform got the 200 ack, never gets the completion signal).
+- **Completion call rejection** (network, expired token, invalid `executionId`): same outcome — silent stuck item if not caught and logged. The completion call is the most failure-prone IO in the script and **must** be isolated:
+
+```javascript
+} finally {
+    try {
+        await vvClient.scripts.completeWorkflowWebService(executionId, output);
+    } catch (err) {
+        logger.error(`WF completion signal failed: ${err.message}`);
+    }
+}
+```
+
+### Reference template
+
+Canonical pattern: `research/ws-script-patterns/drafts/ws_wf.js` (in active development). Smoke test: `research/ws-script-patterns/drafts/ws_wf-test-matrix.js`.
+
 ---
 
 ## Data Flow: Form Script Execution

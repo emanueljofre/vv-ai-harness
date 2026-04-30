@@ -16,7 +16,7 @@ docs/
 
 ### Architecture
 
-- [visualvault-platform.md](architecture/visualvault-platform.md) — URL structure, navigation map, admin tools, user menu, Enterprise Tools, FormsAPI, authentication, version/build discovery, service architecture (per-service behavioral config, FormSettings), dual-app UI framework stack (admin ASP.NET + FormViewer Angular detection), REST API resources, localization API, FormViewer feature map, document index field date handling, auto-save finding, demo + WADNR environment references, Form Designer URL/workflow, template revision lifecycle
+- [visualvault-platform.md](architecture/visualvault-platform.md) — URL structure, navigation map, admin tools, user menu, Enterprise Tools, Process Design Studio (token-bound launch, i18n fallback, workflow editor tabs, execution variable views, event-source UI), FormsAPI, authentication, version/build discovery, service architecture (per-service behavioral config, FormSettings), dual-app UI framework stack (admin ASP.NET + FormViewer Angular detection), REST API resources, localization API, FormViewer feature map, document index field date handling, auto-save finding, demo + WADNR environment references, Form Designer URL/workflow, template revision lifecycle
 
 ### Standards
 
@@ -29,7 +29,7 @@ docs/
 
 - [dev-setup.md](guides/dev-setup.md) — **Canonical setup guide** — environment setup, Playwright, credentials, code quality, troubleshooting
 - [playwright-testing.md](guides/playwright-testing.md) — Playwright patterns, architecture, extension guide
-- [scripting.md](guides/scripting.md) — Node.js server data flow, script contracts, API field casing, date passthrough behavior, FormsAPI access, `response.json()` vs `postCompletion()` execution flow
+- [scripting.md](guides/scripting.md) — Node.js server data flow, script contracts (form, scheduled, workflow microservice), `postCompletion` API quirks, `vvClient.getBaseUrl()` accessor, `completeWorkflowWebService` API + workflow variable mapping (incl. system-typed variables: `Originator` is a User GUID, `SourceDocId` from event sources is the instance-name string), public-docs vs lib `workflowVariables` type discrepancy, API field casing, date passthrough behavior, FormsAPI access, `response.json()` vs `postCompletion()` execution flow
 - [unit-testing.md](guides/unit-testing.md) — Jest unit testing conventions, helpers API, custom matchers, fixture patterns, writing tests for new review rules
 
 ### Reference

@@ -60,7 +60,7 @@ The FormViewer accepts additional URL parameters beyond the core four (`formid`,
 
 Note: `xcid`/`xcdid` accept customer/database **alias strings** as well as GUIDs. Using aliases is simpler when building URLs from config. The REST API `getFormTemplates()` response does NOT include `customerId` or `customerDatabaseId` fields, so you cannot obtain GUIDs from template metadata — use `customerAlias`/`databaseAlias` from your config instead. Verified 2026-04-09 on vvdemo.
 
-Opening a template URL creates a **new blank form instance** each time (named sequentially, e.g., `DateTest-000012`).
+Opening a template URL creates a **new blank form instance** each time (named sequentially, e.g., `DateTest-000012`). Instance names are formed as `<FormName-truncated-to-8-chars>-NNNNNN` with a zero-padded 6-digit counter — short names like `DateTest` pass through unchanged; longer names are truncated (e.g., `Date Test Harness` → `Date Tes-007576`). The counter increments per-template and persists across the table's lifetime.
 
 **Post-save URL behavior (V2 divergence, 2026-04-22)**: When a form is saved via `VV.Form.Save()` on a template URL, `VV.Form.DataID` updates internally to the new record's GUID, but — at least under V2 on vv5dev — the browser URL is NOT rewritten to include `?DataID=...`. The URL stays at `?formid=...` (template mode). Consequence: `page.reload()` (or a browser refresh) re-loads a fresh empty template and silently drops the just-saved record from the view. To reload the saved record, navigate explicitly to the saved-record URL built from `VV.Form.DataID`. This is observable under V2 — V1 behavior may differ (it's possible V1 does push the URL update via Angular routing, but we have not verified on a V1 env). Documented via the withdrawn `FORM-BUG-V2-SAVE-RELOAD-EMPTY` investigation in [`docs/reference/form-fields.md`](../reference/form-fields.md#known-bugs-calendar-field).
 
@@ -609,6 +609,19 @@ Named SQL queries defined on top of a connection. Used in dashboards, reports, a
 
 **API usage:** `vvClient.customQuery.getCustomQueryResultsByName(queryName, params)` — positional args (name first, then params object). Also: `getCustomQueryResultsById(id, params)`. The client has no inline-SQL method — queries must be pre-registered here.
 
+**Row ceiling:** The client library caps `getCustomQueryResultsByName` at **2000 records** per call. Beyond that, a paginating snippet (internal Cacher name `getAllRecords`) is required.
+
+**Two read paths — filter (`q`) vs parameter (`params`) — behave differently** (verified 2026-04-24 on vv5dev):
+
+| Path                                                              | How it's evaluated                                                                      |        Bypasses SQL cache?        |                    Sees fresh rows?                    | Failure mode                                                                            |
+| ----------------------------------------------------------------- | --------------------------------------------------------------------------------------- | :-------------------------------: | :----------------------------------------------------: | --------------------------------------------------------------------------------------- |
+| `q` filter (`{ q: "[col] eq 'val'" }`)                            | VV server applies the OData-style filter **after** the SQL query returns its result set | No — filters the post-SQL payload | Only if the fresh row is already in the SQL result set | Unknown column → HTTP 400 "Query syntax error"; known column, no match → HTTP 200 empty |
+| `params` (`{ params: JSON.stringify([{parameterName, value}]) }`) | Bound directly into `@parameterName` placeholders in the SQL, executed server-side      |           Hits live SQL           |                   Yes — immediately                    | Wrong parameter name → SQL error surfaced in `meta.errors`                              |
+
+**`q` filter column names must match the response-shape keys**, not raw SQL column names or form-API names. Custom query responses lowercase the first character of each SQL column/alias (`DhDocID` → `dhDocID`, see [Scripting — Field Name Casing](../guides/scripting.md#field-name-casing-response-key-transformation)), and `q` parses against those transformed names. `[instanceName]` (the form-API name) fails with HTTP 400. `[dhDocID]`, `[DhDocID]`, and bare `dhDocID` all resolve (the column token is case-insensitive) provided the response-shape name exists.
+
+**`TOP N` without `ORDER BY` silently hides fresh rows from `q` filters on growing tables.** Because `q` runs post-SQL, rows beyond the unordered TOP cutoff are invisible — no error, just zero matches. Rule of thumb: any custom query that might be used with a `q` filter on a table that grows (form data, logs) should include `ORDER BY VVCreateDate DESC` so recent rows stay in the window. The `params` path does not have this problem because the WHERE clause lives in SQL, before TOP.
+
 **On-the-wire serialization (verified 2026-04-22 on vv5dev):** SQL `datetime` columns return as ISO-8601 with trailing `Z` (e.g. `"2026-04-22T18:28:40.987Z"`), and SQL `datetimeoffset` returns as ISO-8601 with explicit offset (e.g. `"2026-04-22T18:28:40.9993913+00:00"`). The raw SQL Server `.ToString()` format (`YYYY-MM-DD HH:mm:ss.SSS`) is NOT what callers see — `customQuery` normalizes to ISO-8601 UTC on the response. The `SYSDATETIMEOFFSET()` offset reveals the SQL host OS TZ.
 
 ### Form Database Schema
@@ -638,6 +651,72 @@ WHERE DhDocID = 'DateTest-001584'
 **Critical implication:** Since there is no `date` column type, the `enableTime` flag is purely a client-side presentation control. Every "date-only" field can contain any time component depending on the write path. See [No Server-Side Date-Only Enforcement](#no-server-side-date-only-enforcement) below.
 
 **VV demo server timezone:** Confirmed as **BRT (UTC-3)** by comparing `VVCreateDate` (server local timestamp) with `Field1` (`new Date().toISOString()` = UTC). Consistent 3-hour offset across all records (e.g., `VVCreateDate=12:53`, `Field1=15:53`). The server stores `VVCreateDate`/`VVModifyDate` in its local timezone, while `toISOString()`-derived field values are stored in UTC. `getSaveValue()`-derived values are timezone-ambiguous (local midnight stored as `00:00:00.000` regardless of actual UTC offset).
+
+---
+
+## Process Design Studio
+
+**URL:** `/ProcessDesignStudio?access_token=...` (top-level nav item, not under Enterprise Tools)
+**App type:** Single-Page App (Angular), separate from the main admin shell.
+
+### Token-bound launch
+
+The SPA cannot be loaded directly via URL. Navigating to `/ProcessDesignStudio/dashboard` without a freshly-issued `access_token` query string fails during boot with `TypeError: Cannot read properties of undefined (reading 'hostUrl')` (visible in the browser console; the page renders empty). The token is generated server-side **only** when the user clicks **Control Panel → Process Design Studio** — the link's `href` is rewritten with a long encrypted payload at click time. For Playwright automation: navigate to `/controlpanel`, click that link, then switch to the new tab. Direct URL navigation to PDS routes (including bookmarked URLs) will not work.
+
+### i18n fallback
+
+When the SPA boots but its translation bundle fails to load (the `Unable to fetch translations for en-US (app)` error in the console), the UI renders raw i18n keys instead of localized labels. Verified keys observed: `DASHBOARD.SIDE_MENU.ITEMS.{HOME,BUSINESS_PROCESS_STATS,PROCESSES,EVENTS,DATA,DATA_VIEWS,DATA_WAREHOUSE,WORKFLOWS,ANALYTICS,DATA_MODELS,DOCUMENT_CLASSIFIER}`, `WORKFLOW.{TITLE,SUB_TITLE,IN_PROCESS,IN_SEARCH,BTN_NEW,BTN_DELETE,TABLE.{NAME,DESCRIPTION,STATUS,MODIFIED,MODIFIEDBY,RUNNINGINSTANCES,OBJECT_ID,EXECUTION}}`, `EVENT_SOURCES.{TITLE,SUB_TITLE,BTN_NEW,BTN_DELETE,TABLE.{NAME,DESCRIPTION,CREATED,MODIFIED},CREATE_FORM.{NAME,TYPE,DESCRIPTION,DATA_SOURCE,FORM_TYPE_1,SELECT_FIELDS,SELECT_SUB_TYPE,SELECT_TYPE,EVENT_TYPE,EVENT_TYPES,EVENT_1,EVENT_2,EVENT_3,RELATED_PROCESSES,IN_USE},EDIT_FORM.{TITLE,BTN_OK,BTN_CANCEL},MODAL_CONFIRM.{TITLE,BTN_OK,BTN_CANCEL}}`, `HOME.{TITLE,SUB_TITLE}`, `DATA_WAREHOUSE.CREATE_FORM.{ADDITIONAL_FIELDS,ADDITIONAL_FIELDS_LABEL}`. Useful for Playwright selectors when translation is unreliable.
+
+### Side menu structure
+
+| Item                                         | Notes                                                                                                            |
+| -------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| Home                                         | Default landing — shows counters (Workflows, Event Sources, Data Views, Events) and "Workflows in Progress" grid |
+| Business Process Stats                       | —                                                                                                                |
+| Processes                                    | —                                                                                                                |
+| Events                                       | Event Sources list and create/edit (see below)                                                                   |
+| Data → Data Views, Data Warehouse            | —                                                                                                                |
+| Workflows                                    | Workflow list (Name, Description, Status, Modified, ModifiedBy, RunningInstances)                                |
+| Analytics → Data Models, Document Classifier | —                                                                                                                |
+
+### Workflow editor — tabs
+
+`/ProcessDesignStudio/dashboard/workflows/edit/{workflowId}` opens four tabs in the right rail:
+
+| Tab          | Content                                                                                                                                                                                                                                                                                                                                                                                            |
+| ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Designer** | Default view. BPMN canvas + Actions/Variables panel. Lists 18 action types: Copy or Move Document, Copy or Move Folder, Create Document from Template, Create Folder, Decision, Document Classifier, Document Data Lookup, Email, Finish, Form Data Lookup, Human Decision, Human Task, Loop, Microservice, Parallel Start & Join, Relate Form, Update Document, Update Form, Variable Assignment. |
+| Events       | Event source bindings for this workflow                                                                                                                                                                                                                                                                                                                                                            |
+| Test         | Manual workflow test runner                                                                                                                                                                                                                                                                                                                                                                        |
+| **History**  | Past executions grid: Initiated By, Start Date, End Date, Version, Object ID, Status. Each row has Retrigger / View buttons.                                                                                                                                                                                                                                                                       |
+
+### Workflow execution detail — variables
+
+Clicking **View** on a History row opens the execution detail. The variables panel has **two distinct views** depending on what's selected:
+
+| Selection                                | What the variables panel shows                                                                                                                                                                          |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Nothing selected (top-level)             | The **final** workflow-variable values after all steps ran. If any step errored, all values may show `Null` regardless of what data flowed through earlier steps.                                       |
+| A specific step node (e.g. Microservice) | The values that were available **as input to that step**. This is the only place to see what the WF engine had at step entry — useful when the top-level shows `Null` but the engine actually had data. |
+
+To see step-input values, click the step node in the BPMN visualization on the right side of the panel.
+
+### Event Source — UI structure
+
+Path: PDS dashboard → **Events** sidebar item (heading shows "Event Sources").
+
+| Field                          | Notes                                                                                                                                                                                                                                                                                               |
+| ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Name (required)                | Free text                                                                                                                                                                                                                                                                                           |
+| Type (required)                | Dropdown: `Form Data` or `Document Data`. Locked once the event source is referenced by a workflow.                                                                                                                                                                                                 |
+| Description                    | Optional, max 255 chars                                                                                                                                                                                                                                                                             |
+| Form template (Form Data type) | Dropdown of templates in the customer DB                                                                                                                                                                                                                                                            |
+| Selected fields                | Multi-select listbox of fields from the chosen template. These become workflow variables on workflows that reference this event source.                                                                                                                                                             |
+| Additional fields              | Multi-select. Includes `instancename` (the form record's instance name string).                                                                                                                                                                                                                     |
+| Event Types                    | Three checkboxes labeled by i18n keys `EVENT_1`, `EVENT_2`, `EVENT_3`. The event-types that fire the event — e.g. on Form Data sources, EVENT_1/EVENT_2 are commonly checked together while EVENT_3 is left off (likely Created/Modified vs Deleted, but the i18n keys do not confirm the mapping). |
+| Related Processes              | Read-only display of workflows currently using this source                                                                                                                                                                                                                                          |
+
+**Locking rule:** Once an event source is referenced by a workflow ("Event source is being referenced by a workflow and only new fields can be added"), the Type, Form template, Selected fields, and Event Types become read-only. Only adding new fields is permitted.
 
 ---
 
@@ -925,7 +1004,7 @@ Despite these differences, all tested slots (742 executions across Forms, Web Se
 - **Server TZ is irrelevant to form saves**: Cat 16 confirmed that `utcOffset` (-3 vs -7) does not affect form date storage — all processing happens client-side or in FormsAPI.
 - **Kendo v1 vs v2 produce equivalent values**: Cat 15 confirmed the widget layer difference doesn't affect date values — bugs are in the `calendarValueService`, not the Kendo widget.
 
-**One infrastructure gap remains**: DocAPI is enabled on vv5dev but disabled on vvdemo. Document Library date bugs (DOC-BUG-1/2) have not been formally tested on either environment — this is the one component where the infrastructure difference could produce divergent behavior.
+**Document Library status (updated 2026-04-24)**: DOC-1..DOC-4 + DOC-7 + DOC-11 baselined on vv5dev (40/40 PASS across 4 TZ × 3 browsers). One behavior divergence vs. vvdemo surfaced — empty-string clearing (`PUT indexFields {Date: ""}`) **clears** the field on vv5dev but matches the DOC-BUG-2 "value persists" behavior on vvdemo. Other clearing attempts (`"null"`, `"undefined"`, `"0"`, `"2026"`) still preserve previous value on both. Possible partial fix in a newer build, possible Central Admin scope difference — not yet root-caused. DOC-5/6/8 (UI round-trip, cross-layer, DocAPI differential) still pending infrastructure work.
 
 ### FormViewer Build Number
 
@@ -1361,16 +1440,35 @@ Key behaviors:
 
 **REST API endpoints** for document index fields (from `lib/.../config.yml`):
 
-| Endpoint                                   | Method | Purpose                                                             |
-| ------------------------------------------ | ------ | ------------------------------------------------------------------- |
-| `/documents/{id}/indexfields`              | GET    | Read index field values on a document                               |
-| `/documents/{id}/indexfields`              | PUT    | Write index field values (JSON-stringified `{ FieldLabel: value }`) |
-| `/folders/{id}/indexfields`                | GET    | List index fields assigned to a folder                              |
-| `/folders/{id}/indexfields/{indexFieldId}` | PUT    | Update folder index field settings (default value, queryId)         |
-| `/indexfields`                             | GET    | List all index field definitions                                    |
-| `/indexfields/{id}/folders/{folderId}`     | PUT    | Assign an index field to a folder                                   |
+| Endpoint                                   | Method | Purpose                                                                 |
+| ------------------------------------------ | ------ | ----------------------------------------------------------------------- |
+| `/documents`                               | POST   | Upload a document (multipart). Returns `id = revisionId` — see below    |
+| `/documents`                               | GET    | List/query documents — supports ODATA `?q=` filter (see below)          |
+| `/documents/{id}/indexfields`              | GET    | Read index field values on a document (id = documentId, NOT revisionId) |
+| `/documents/{id}/indexfields`              | PUT    | Write index field values (JSON-stringified `{ FieldLabel: value }`)     |
+| `/folders`                                 | POST   | Create folder by path (`{ name, description, folderpath }`)             |
+| `/folders/{id}/indexfields`                | GET    | List index fields assigned to a folder                                  |
+| `/folders/{id}/indexfields/{indexFieldId}` | PUT    | Update folder index field settings (default value, queryId)             |
+| `/folders/{id}/documents`                  | GET    | List documents in a folder                                              |
+| `/indexfields`                             | GET    | List all index field definitions                                        |
+| `/indexfields/{id}/folders/{folderId}`     | PUT    | Assign an index field to a folder                                       |
 
-See `research/date-handling/document-library/matrix.md` for the test matrix (8 categories, 52 slots) and `testing/specs/date-handling/doc-index-field-dates.spec.js` for 32 data-driven regression tests.
+> **No REST endpoint exists to create global index field definitions** — they must be created via Admin UI → Index Field Admin. Verified 2026-04-24 by exhaustive endpoint probing.
+
+**revisionId vs documentId** (verified 2026-04-24): `POST /documents` returns `{ id: <revisionId> }`. The `/documents/{id}/indexfields` endpoint expects the **stable documentId**, not the revisionId. To resolve: re-list the folder via `GET /folders/{folderId}/documents` and match on `id` to read each row's `documentId` field. Mixing the two surfaces as `meta.status: 400 / "Document not found"` (HTTP 200 envelope — see HTTP-200 envelope pattern below).
+
+**HTTP-200-with-meta-error envelope**: VV REST APIs return HTTP 200 even when the operation logically failed. The real status is in `meta.status` (200 = ok; 400 = bad request) and `meta.errors[]`. Always check `meta.status === 200` after parsing — `resp.ok()` alone is insufficient.
+
+**Index field default values** (verified 2026-04-24, DOC-11): Global index fields support a `defaultValue` set in the field definition (Admin UI → Index Field Admin). Stored naively (no Z suffix) — DOC-BUG-1 extends to defaults. When a fresh document is uploaded into a folder where the field is assigned, the default is auto-applied as a literal byte-for-byte copy (no TZ re-interpretation). Overwritable via PUT.
+
+**Document query (`GET /documents?q=...`)** — verified 2026-04-24:
+
+- **Filter syntax**: ODATA-style `?q=<field> <op> '<value>'`. Supported operators: `eq`, `ne`, `gt`, `lt`, with boolean `and` for composition. Example: `?q=Date gt '2026-03-01' and Date lt '2026-04-01'`.
+- **Direct params silently ignored**: `?Date=...`, `?indexFields=...`, `?filter=...`, and even `?folderId=...` all return the unfiltered result set.
+- **Null literal not supported**: `Date eq null` errors with `Invalid expression, invalid column: 'null', at loc:8`. Use `Date eq ''` to find documents with an unset Date value.
+- **DOC-BUG-1 extends to query**: a value written as `2026-03-15T14:30:00-03:00` is stored as `2026-03-15T17:30:00`. Querying with the original local time returns 0 hits; querying with the stored UTC returns 1. Consumers must search by the server-converted UTC, not the value they wrote.
+
+See `research/date-handling/document-library/matrix.md` for the full test matrix (11 categories, 74 slots) and `testing/specs/date-handling/doc-index-field-dates.spec.js` for 42 data-driven regression tests.
 
 ### Auto-Save
 
