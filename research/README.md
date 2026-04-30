@@ -23,6 +23,8 @@ research/
 | [form-templates](form-templates/)             | Active      | VV form template format analysis (XML + JSON), documentation, and improved template generation                                     |
 | [extract-optimization](extract-optimization/) | Active      | Extract pipeline speed + reliability — parallel extraction, revision tracking, API-first                                           |
 | [standards-review](standards-review/)         | In Progress | Deterministic standards compliance tool — 49 rules for form templates, unit tested                                                 |
+| [ws-script-patterns](ws-script-patterns/)     | In Progress | Validate and expand canonical script templates (web service, scheduled process, WS for workflow)                                   |
+| [forminstance-pattern](forminstance-pattern/) | In Progress | Validate `vvClient.formsApi.formInstances` create + update as a workaround for WS-BUG-1 cross-layer shift                          |
 
 ## Complete
 

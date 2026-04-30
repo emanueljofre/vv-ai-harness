@@ -28,12 +28,14 @@ Execution output bound to a specific customer or environment — actual observed
 
 ## Active
 
-| Task                    | Description                                                                                          |
-| ----------------------- | ---------------------------------------------------------------------------------------------------- |
-| `date-handling/`        | Cross-platform date bug investigation (Forms, WS, Dashboards, Document Library) — 16 confirmed bugs  |
-| `form-templates/`       | VV form template XML analysis, format documentation, template generation                             |
-| `extract-optimization/` | Extract pipeline speed + reliability — parallel extraction, revision tracking, API-first             |
-| `standards-review/`     | Deterministic standards compliance tool for VV components (form templates, web services, dashboards) |
+| Task                    | Description                                                                                               |
+| ----------------------- | --------------------------------------------------------------------------------------------------------- |
+| `date-handling/`        | Cross-platform date bug investigation (Forms, WS, Dashboards, Document Library) — 16 confirmed bugs       |
+| `form-templates/`       | VV form template XML analysis, format documentation, template generation                                  |
+| `extract-optimization/` | Extract pipeline speed + reliability — parallel extraction, revision tracking, API-first                  |
+| `standards-review/`     | Deterministic standards compliance tool for VV components (form templates, web services, dashboards)      |
+| `ws-script-patterns/`   | Validate and expand canonical script templates (web service, scheduled process, WS for workflow)          |
+| `forminstance-pattern/` | Validate `vvClient.formsApi.formInstances` create + update as a workaround for WS-BUG-1 cross-layer shift |
 
 ## Complete (`_archive/`)
 
