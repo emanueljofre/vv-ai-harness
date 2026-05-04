@@ -388,8 +388,18 @@ async function main() {
             results: allResults,
         };
 
-        fs.writeFileSync(RESULTS_PATH, JSON.stringify(output, null, 2));
+        // Write a timestamped sibling alongside the stable latest pointer so
+        // scoped invocations (e.g. --action WS-8) don't clobber prior batches'
+        // status stamps for the task:status rollup, which aggregates every
+        // regression-results JSON under projects/{customer}/. Mirrors the
+        // forms regression-reporter convention.
+        const fileTimestamp = new Date().toISOString().replace(/[:.]/g, '-').substring(0, 19);
+        const timestampedPath = path.join(RESULTS_DIR, `ws-regression-results-${fileTimestamp}.json`);
+        const serialized = JSON.stringify(output, null, 2);
+        fs.writeFileSync(timestampedPath, serialized);
+        fs.writeFileSync(RESULTS_PATH, serialized);
         console.log(`Results saved: ${RESULTS_PATH}`);
+        console.log(`  + timestamped: ${timestampedPath}`);
         console.log(
             `Summary: ${output.summary.total} total — ${output.summary.passed} passed / ${output.summary.failed} failed / ${output.summary.unknown} unknown / ${output.summary.errors} errors`
         );
