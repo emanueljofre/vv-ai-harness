@@ -24,12 +24,20 @@ module.exports.main = async function (vvClient, response, token) {
     Preconditions:
                     - List of libraries, forms, queries, etc. that must exist for this code to run
                     - List other preconditions such as user permissions, environments, etc.
+    Return Object:
+                    Scheduled processes return via postCompletion, not the HTTP response. Contract:
 
-    Completion contract:
-                    postCompletion(token, action, result, message) signals completion to the scheduler.
-                    action:  'Complete'
-                    result:  true on Success/Warning paths, false on Error
-                    message: Scheduled Service Log message
+                    postCompletion(token, action, result, message)
+                      action:  'Complete'
+                      result:  true on Success/Warning paths, false on Error
+                      message: Scheduled Service Log message — surfaced in the SP log
+
+                    Internally, output.status drives the call above:
+                      "Success" - result=true,  message='Completed successfully'
+                      "Warning" - result=true,  message=joined errors
+                      "Error"   - result=false, message=joined errors
+
+                    output.errors: Array of error messages (mirrored to logEntry)
 
     Pseudo code:
                     1. Business logic
@@ -202,6 +210,7 @@ module.exports.main = async function (vvClient, response, token) {
         output.errors.push(err.message);
     } finally {
         try {
+            // Enable completion callback in the web service configuration to send completion status back to VisualVault
             await vvClient.scheduledProcess.postCompletion(
                 processID,
                 'Complete',

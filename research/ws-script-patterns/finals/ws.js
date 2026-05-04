@@ -20,7 +20,7 @@ module.exports.main = async function (ffCollection, vvClient, response) {
     /*
     Script Name:    Script Name Here
     Customer:       Project Name
-    Purpose:        Brief description of the purpose of the script. Called as a microservice from the VisualVault V5 Process Studio workflow.
+    Purpose:        Brief description of the purpose of the script
     Preconditions:
                     - List of libraries, forms, queries, etc. that must exist for this code to run
                     - List other preconditions such as user permissions, environments, etc.
@@ -28,14 +28,13 @@ module.exports.main = async function (ffCollection, vvClient, response) {
                     parameter1: Description of parameter1
                     parameter2: Description of parameter2
     Return Object:
-                    output.MicroserviceResult:  true  - Process completed (Success or Warning paths)
-                                                false - Critical error; workflow should branch to error path
-                    output.MicroserviceMessage: Human-readable summary; carries joined error messages on Warning/Error paths
-                    output.errors:              Array of error messages
+                    output.status: "Success" - Process completed without errors
+                                   "Warning" - Process completed with non-critical errors
+                                   "Error"   - Process could not be completed due to a critical error
+                    output.errors: Array of error messages
+                    output.data:   Return payload
 
-                    Note: The workflow engine consumes fields mapped to workflow variables in Process Studio.
-                          MicroserviceResult and MicroserviceMessage are conventional; output.errors and any
-                          additional fields require explicit variable mapping to be readable from the workflow.
+                    Note: The legacy array format (["Success", "message", data]) is deprecated.
 
     Pseudo code:
                     1. Validate parameters
@@ -51,15 +50,12 @@ module.exports.main = async function (ffCollection, vvClient, response) {
 
     /* ------------------------ Response & Log Variables ------------------------ */
 
-    const serviceName = 'MyWorkflowMicroservice';
-
-    // Execution ID is needed from the http header in order to help VV identify which workflow item/microservice is complete.
-    const executionId = response.req.headers['vv-execution-id'];
+    const serviceName = 'ServiceNameHere';
 
     const output = {
+        data: null,
         errors: [],
-        MicroserviceMessage: '',
-        MicroserviceResult: true,
+        status: 'Success',
     };
 
     const sessionToken = vvClient._httpHelper?._sessionToken ?? {};
@@ -78,6 +74,7 @@ module.exports.main = async function (ffCollection, vvClient, response) {
     /* ------------------------- Configurable Variables ------------------------- */
 
     // Define constants and configuration here. Examples:
+    // const FORM_TEMPLATE_NAME = "User Registration";
     // const QUERY_NAME = "GetActiveUsers";
 
     /* ---------------------------- Helper Functions ---------------------------- */
@@ -235,11 +232,6 @@ module.exports.main = async function (ffCollection, vvClient, response) {
 
     /* ---------------------------------- Main ---------------------------------- */
 
-    // Platform acknowledgment
-    response.json(200, {
-        success: true,
-        message: `${serviceName} Started`,
-    });
     logger.info(sanitizeLog(logEntry));
 
     try {
@@ -247,37 +239,28 @@ module.exports.main = async function (ffCollection, vvClient, response) {
         // const firstName = getFieldValueByName('First Name');
 
         if (output.errors.length > 0) {
-            throw new Error(output.errors.join('; '));
+            throw new Error('Required fields are missing or invalid');
         }
 
         // Business logic
-        // ...
+        //...
 
-        // Set the success/warning status
-        if (output.errors.length > 0) {
-            logEntry.status = 'Warning';
-            output.MicroserviceMessage = output.errors.join('; ');
-        } else {
-            logEntry.status = 'Success';
-            output.MicroserviceMessage = 'Microservice completed successfully';
-        }
+        // Assign return data here
+        // output.data = someData;
+
+        // Set status
+        if (output.errors.length > 0) output.status = 'Warning';
     } catch (err) {
-        logEntry.status = 'Error';
+        output.status = 'Error';
         output.errors.push(err.message);
-        output.MicroserviceResult = false;
-        output.MicroserviceMessage = err.message;
     } finally {
-        try {
-            await vvClient.scripts.completeWorkflowWebService(executionId, output);
-        } catch (err) {
-            logEntry.status = 'Error';
-            output.errors.push(`WF completion signal failed: ${err.message}`);
-        }
+        response.json(200, output);
 
+        logEntry.status = output.status;
         logEntry.errors = output.errors;
 
-        if (logEntry.status === 'Error') logger.error(sanitizeLog(logEntry));
-        else if (logEntry.status === 'Warning') logger.warn(sanitizeLog(logEntry));
+        if (output.status === 'Error') logger.error(sanitizeLog(logEntry));
+        else if (output.status === 'Warning') logger.warn(sanitizeLog(logEntry));
         else logger.info(sanitizeLog(logEntry));
     }
 };
